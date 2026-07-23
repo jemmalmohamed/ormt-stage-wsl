@@ -48,7 +48,13 @@ run_with_heartbeat() {
     sleep 30
     seconds=$((seconds + 30))
     if kill -0 "$pid" 2>/dev/null; then
-      log "$label toujours en cours (${seconds}s)"
+      log "$label - aucun nouveau log depuis la commande (${seconds}s)"
+      printf 'Processus actifs lies a l installation:\n'
+      ps -eo etime=,stat=,comm=,args= \
+        | awk '$3 ~ /^(ansible.*|apt|apt-get|dpkg|mvn|java|docker|npm|node)$/ {
+            printf "  duree=%-10s etat=%-4s processus=%-18s %s\n", $1, $2, $3, substr($0, index($0,$4))
+          }' \
+        | tail -n 12 || true
     fi
   done
 
@@ -64,12 +70,18 @@ run_with_heartbeat() {
 
 infra_ready() {
   local expected_mode="complete"
+  local api_branch="micro-service"
+  local web_branch="micro-service"
   if grep -q '^ORMT_INSTALL_DEV_TOOLS=false' .env 2>/dev/null; then
     expected_mode="light"
   fi
+  api_branch="$(sed -n 's/^ORMT_API_BRANCH=//p' .env | tail -n 1)"
+  web_branch="$(sed -n 's/^ORMT_WEB_BRANCH=//p' .env | tail -n 1)"
+  api_branch="${api_branch:-micro-service}"
+  web_branch="${web_branch:-micro-service}"
 
   [ -f .infra-installed ] || return 1
-  grep -qx "$expected_mode" .infra-installed || return 1
+  grep -Fqx "${expected_mode}|${api_branch}|${web_branch}" .infra-installed || return 1
   command -v docker >/dev/null 2>&1 || return 1
   timeout 10 docker network inspect proxy >/dev/null 2>&1 || return 1
   timeout 10 docker ps --format '{{.Names}}|{{.Image}}' | awk -F'|' 'tolower($2) ~ /traefik/ {found=1} END {exit found ? 0 : 1}'

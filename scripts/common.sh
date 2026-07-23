@@ -13,6 +13,9 @@ fi
 ORMT_INFRA_REPO_URL="${ORMT_INFRA_REPO_URL:-https://github.com/jemmalmohamed/ormt-infra-stage-local-vps.git}"
 ORMT_API_REPO_URL="${ORMT_API_REPO_URL:-https://github.com/jemmalmohamed/ormt-api.git}"
 ORMT_WEB_REPO_URL="${ORMT_WEB_REPO_URL:-https://github.com/jemmalmohamed/ormt-web-v1.git}"
+ORMT_INFRA_BRANCH="${ORMT_INFRA_BRANCH:-}"
+ORMT_API_BRANCH="${ORMT_API_BRANCH:-micro-service}"
+ORMT_WEB_BRANCH="${ORMT_WEB_BRANCH:-micro-service}"
 
 ORMT_INFRA_DIR="${ORMT_INFRA_DIR:-../ormt-infra-stage-local-vps}"
 ORMT_API_DIR="${ORMT_API_DIR:-../ormt-api}"
@@ -62,9 +65,26 @@ clone_if_missing() {
   local dir="$1"
   local url="$2"
   local name="$3"
+  local branch="${4:-}"
 
   if [ -d "$dir/.git" ]; then
-    log "$name déjà présent: $dir"
+    log "$name deja present: $dir"
+    if [ -n "$branch" ]; then
+      log "Synchronisation de $name sur la branche $branch"
+      (
+        cd "$dir"
+        if [ -n "$(git status --porcelain)" ]; then
+          die "$name contient des modifications locales. Commit ou stash requis avant le changement vers $branch."
+        fi
+        git fetch origin "$branch"
+        if git show-ref --verify --quiet "refs/heads/$branch"; then
+          git checkout "$branch"
+        else
+          git checkout -b "$branch" --track "origin/$branch"
+        fi
+        git pull --ff-only origin "$branch"
+      )
+    fi
     return
   fi
 
@@ -72,8 +92,13 @@ clone_if_missing() {
     die "$name existe mais ce n'est pas un dépôt Git valide: $dir"
   fi
 
-  log "Clonage $name"
-  git clone "$url" "$dir"
+  if [ -n "$branch" ]; then
+    log "Clonage $name (branche $branch)"
+    git clone --branch "$branch" --single-branch "$url" "$dir"
+  else
+    log "Clonage $name"
+    git clone "$url" "$dir"
+  fi
 }
 
 compose_up() {

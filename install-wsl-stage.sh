@@ -19,9 +19,9 @@ sudo apt install -y git ansible python3-pip curl ca-certificates
 
 need_cmd git
 
-clone_if_missing "$ORMT_INFRA_DIR" "$ORMT_INFRA_REPO_URL" "ormt-infra-stage-local-vps"
-clone_if_missing "$ORMT_API_DIR" "$ORMT_API_REPO_URL" "ormt-api"
-clone_if_missing "$ORMT_WEB_DIR" "$ORMT_WEB_REPO_URL" "ormt-web-v1"
+clone_if_missing "$ORMT_INFRA_DIR" "$ORMT_INFRA_REPO_URL" "ormt-infra-stage-local-vps" "$ORMT_INFRA_BRANCH"
+clone_if_missing "$ORMT_API_DIR" "$ORMT_API_REPO_URL" "ormt-api" "$ORMT_API_BRANCH"
+clone_if_missing "$ORMT_WEB_DIR" "$ORMT_WEB_REPO_URL" "ormt-web-v1" "$ORMT_WEB_BRANCH"
 
 [ -n "$ORMT_LINUX_USER" ] || die "Utilisateur Linux introuvable. Définis ORMT_LINUX_USER dans .env."
 
@@ -40,7 +40,7 @@ if [ "$ORMT_INSTALL_DEV_TOOLS" != "true" ]; then
   ansible_args+=(--skip-tags homepage,portainer,monitoring,jenkins)
 fi
 
-(cd "$ORMT_INFRA_DIR/ansible" && ansible-playbook "${ansible_args[@]}")
+(cd "$ORMT_INFRA_DIR/ansible" && ansible-playbook -v "${ansible_args[@]}")
 
 log "Validation Docker et proxy"
 sudo service docker start >/dev/null 2>&1 || true
@@ -66,10 +66,11 @@ else
 fi
 
 if [ "$ORMT_INSTALL_DEV_TOOLS" = "true" ]; then
-  printf 'complete\n' > "$ROOT_DIR/.infra-installed"
+  install_mode="complete"
 else
-  printf 'light\n' > "$ROOT_DIR/.infra-installed"
+  install_mode="light"
 fi
+printf '%s|%s|%s\n' "$install_mode" "$ORMT_API_BRANCH" "$ORMT_WEB_BRANCH" > "$ROOT_DIR/.infra-installed"
 
 cat <<'MSG'
 
