@@ -28,6 +28,8 @@ check() {
 log "Test de l'infrastructure WSL"
 check "Docker repond" timeout 15 docker version
 check "Docker Compose disponible" docker compose version
+check "Utilisateur membre du groupe docker" bash -c "id -nG | tr ' ' '\n' | grep -qx docker"
+check "Socket Docker accessible sans sudo" docker ps
 check "Reseau proxy present" docker network inspect proxy
 check "Traefik actif" bash -c "docker ps --format '{{.Image}}' | grep -qi traefik"
 check "Depot infrastructure present" test -d "$ORMT_INFRA_DIR/.git"

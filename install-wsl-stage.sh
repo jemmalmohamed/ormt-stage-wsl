@@ -44,6 +44,14 @@ fi
 
 log "Validation Docker et proxy"
 sudo service docker start >/dev/null 2>&1 || true
+
+log "Configuration de l'acces Docker pour $ORMT_LINUX_USER"
+sudo groupadd --force docker
+sudo usermod --append --groups docker "$ORMT_LINUX_USER"
+if ! getent group docker | cut -d: -f4 | tr ',' '\n' | grep -Fxq "$ORMT_LINUX_USER"; then
+  die "Impossible d'ajouter $ORMT_LINUX_USER au groupe docker."
+fi
+
 if ! timeout 15 docker version >/dev/null 2>&1; then
   if timeout 15 sudo docker version >/dev/null 2>&1; then
     cat <<'MSG'

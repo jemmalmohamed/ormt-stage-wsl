@@ -160,6 +160,12 @@ if command -v docker >/dev/null 2>&1; then
   log "Démarrage de Docker si nécessaire"
   sudo service docker start >/dev/null 2>&1 || true
 
+  if ! getent group docker | cut -d: -f4 | tr ',' '\n' | grep -Fxq "$USER"; then
+    log "Ajout automatique de $USER au groupe docker"
+    sudo groupadd --force docker
+    sudo usermod --append --groups docker "$USER"
+  fi
+
   if ! docker ps >/dev/null 2>&1; then
     log "Activation immédiate du groupe docker pour cette session"
     exec sg docker -c "cd '$SCRIPT_DIR' && ./setup-after-docker-group.sh"
