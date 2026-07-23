@@ -22,7 +22,10 @@ show_failure() {
 
   printf '\n============================================================\n' >&2
   printf 'ÉCHEC DE L’INSTALLATION\n' >&2
-  printf 'Étape/commande : %s\n' "$command" >&2
+  if [ -n "${CURRENT_STEP:-}" ]; then
+    printf 'Etape          : %s\n' "$CURRENT_STEP" >&2
+  fi
+  printf 'Commande       : %s\n' "$command" >&2
   printf 'Ligne          : %s\n' "$line" >&2
   printf 'Code erreur    : %s\n' "$exit_code" >&2
   printf 'Relance setup.bat : les étapes déjà terminées seront réutilisées.\n' >&2
@@ -35,6 +38,7 @@ run_with_heartbeat() {
   local label="$1"
   shift
 
+  CURRENT_STEP="$label"
   log "$label"
   "$@" &
   local pid=$!
@@ -48,10 +52,24 @@ run_with_heartbeat() {
     fi
   done
 
-  wait "$pid"
+  if wait "$pid"; then
+    log "$label termine avec succes"
+    CURRENT_STEP=""
+  else
+    local status=$?
+    printf '\nERREUR: %s a echoue (code %s).\n' "$label" "$status" >&2
+    return "$status"
+  fi
 }
 
 infra_ready() {
+  local expected_mode="complete"
+  if grep -q '^ORMT_INSTALL_DEV_TOOLS=false' .env 2>/dev/null; then
+    expected_mode="light"
+  fi
+
+  [ -f .infra-installed ] || return 1
+  grep -qx "$expected_mode" .infra-installed || return 1
   command -v docker >/dev/null 2>&1 || return 1
   timeout 10 docker network inspect proxy >/dev/null 2>&1 || return 1
   timeout 10 docker ps --format '{{.Names}}|{{.Image}}' | awk -F'|' 'tolower($2) ~ /traefik/ {found=1} END {exit found ? 0 : 1}'
@@ -136,7 +154,10 @@ if command -v docker >/dev/null 2>&1; then
   fi
 fi
 
-run_with_heartbeat "Démarrage ORMT Stage" ./start-stage.sh
+log "TEST 1/2 - Validation de l'infrastructure avant Stage"
+./test-infrastructure.sh
 
-log "Diagnostic final"
-./status-stage.sh
+run_with_heartbeat "DEMARRAGE STAGE - construction et lancement des services" ./start-stage.sh
+
+log "TEST 2/2 - Validation fonctionnelle apres deploiement"
+./test-stage.sh

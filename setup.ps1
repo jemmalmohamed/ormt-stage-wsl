@@ -9,6 +9,7 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 $LogDir = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "logs"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $LogFile = Join-Path $LogDir ("setup-{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
+$StartedAt = Get-Date
 
 function Disable-QuickEdit {
   try {
@@ -34,7 +35,11 @@ public static class ConsoleMode {
       $quickEdit = 0x0040
       $insertMode = 0x0020
       $extendedFlags = 0x0080
-      $newMode = ($mode -bor $extendedFlags) -band (-bnot $quickEdit) -band (-bnot $insertMode)
+      $virtualTerminalInput = 0x0200
+      $newMode = ($mode -bor $extendedFlags) `
+        -band (-bnot $quickEdit) `
+        -band (-bnot $insertMode) `
+        -band (-bnot $virtualTerminalInput)
       [void][ConsoleMode]::SetConsoleMode($handle, $newMode)
     }
   }
@@ -45,12 +50,22 @@ public static class ConsoleMode {
 
 Disable-QuickEdit
 
+# Désactive aussi les anciens modes de suivi de souris de Windows Terminal.
+$escape = [char]27
+Write-Host "${escape}[?1000l${escape}[?1002l${escape}[?1003l${escape}[?1006l" -NoNewline
+Clear-Host
+
 function Write-Step {
   param([string]$Message)
+  $stamp = Get-Date -Format "HH:mm:ss"
   Write-Host ""
-  Write-Host "[$(Get-Date -Format HH:mm:ss)] $Message"
+  Write-Host "============================================================" -ForegroundColor Cyan
+  Write-Host "[$stamp] $Message" -ForegroundColor Cyan
+  Write-Host "============================================================" -ForegroundColor Cyan
   Add-Content -Path $LogFile -Value ""
-  Add-Content -Path $LogFile -Value "[$(Get-Date -Format HH:mm:ss)] $Message"
+  Add-Content -Path $LogFile -Value "============================================================"
+  Add-Content -Path $LogFile -Value "[$stamp] $Message"
+  Add-Content -Path $LogFile -Value "============================================================"
 }
 
 function Stop-WithMessage {
@@ -61,20 +76,6 @@ function Stop-WithMessage {
   Write-Host ""
   Write-Host "Log complet: $LogFile"
   exit 1
-}
-
-function Convert-ToWslPath {
-  param([string]$WindowsPath)
-
-  $fullPath = [System.IO.Path]::GetFullPath($WindowsPath)
-  $pathRoot = [System.IO.Path]::GetPathRoot($fullPath)
-  if (-not $pathRoot -or $pathRoot.Length -lt 2 -or $pathRoot[1] -ne ':') {
-    throw "Chemin Windows non pris en charge: $fullPath"
-  }
-
-  $drive = $pathRoot.Substring(0, 1).ToLowerInvariant()
-  $relativePath = $fullPath.Substring($pathRoot.Length).Replace('\', '/')
-  return "/mnt/$drive/$relativePath"
 }
 
 function Invoke-LoggedProcess {
@@ -96,19 +97,12 @@ function Invoke-InteractiveWslSetup {
   param(
     [string]$Distribution,
     [string]$WorkingDirectory,
-    [string]$LinuxLogFile
+    [string]$LogFileName
   )
-
-  $command = @'
-chmod +x ./setup.sh ./setup-after-docker-group.sh ./install-wsl-stage.sh ./start-stage.sh ./status-stage.sh ./stop-stage.sh ./reset-stage.sh ./scripts/common.sh 2>/dev/null || true
-set -o pipefail
-./setup.sh 2>&1 | tee -a "$ORMT_WINDOWS_LOG"
-exit "${PIPESTATUS[0]}"
-'@
 
   # Appel direct indispensable : stdin reste relié au terminal pour sudo.
   & wsl.exe -d $Distribution --cd $WorkingDirectory -- `
-    env "ORMT_WINDOWS_LOG=$LinuxLogFile" bash -lc $command
+    bash ./run-wsl-stage.sh $LogFileName
 
   return $LASTEXITCODE
 }
@@ -143,31 +137,54 @@ if (-not $hasDistro) {
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$linuxDirOutput = & wsl.exe -d $Distro --cd "$scriptDir" -- pwd
-if ($LASTEXITCODE -ne 0 -or -not $linuxDirOutput) {
-  Stop-WithMessage "Ubuntu n'est pas encore initialisé. Ouvre $Distro depuis le menu Démarrer, crée l'utilisateur Linux, puis relance setup.bat."
-}
-$linuxDir = ($linuxDirOutput | Out-String).Trim()
 
-try {
-  $linuxLogFile = Convert-ToWslPath -WindowsPath $LogFile
+# Un echec ponctuel de --cd ne signifie pas que la distribution est vierge.
+# On teste directement l'utilisateur Linux et on laisse WSL quelques secondes
+# pour redemarrer apres une installation ou un arret recent.
+$wslReady = $false
+for ($attempt = 1; $attempt -le 3; $attempt++) {
+  $probeOutput = & wsl.exe -d $Distro -- sh -lc "id -u && printf WSL_READY" 2>$null
+  if ($LASTEXITCODE -eq 0 -and (($probeOutput | Out-String) -match "WSL_READY")) {
+    $wslReady = $true
+    break
+  }
+  Write-Host "WSL ne repond pas encore (tentative $attempt/3)..." -ForegroundColor Yellow
+  Start-Sleep -Seconds 2
 }
-catch {
-  Stop-WithMessage "Impossible de préparer le fichier de log WSL: $($_.Exception.Message)"
+
+if (-not $wslReady) {
+  Write-Step "Premiere initialisation automatique de $Distro"
+  Write-Host "Ubuntu va s'ouvrir dans cette fenetre." -ForegroundColor Yellow
+  Write-Host "Cree le nom d'utilisateur et le mot de passe Linux si Ubuntu le demande."
+  Write-Host "Quand le prompt Linux apparait, tape: exit"
+  Write-Host ""
+
+  # Ce lancement interactif declenche l'assistant initial Ubuntu et conserve
+  # le clavier pour la creation du compte.
+  & wsl.exe -d $Distro
+
+  $probeOutput = & wsl.exe -d $Distro -- sh -lc "id -u && printf WSL_READY" 2>$null
+  if ($LASTEXITCODE -ne 0 -or (($probeOutput | Out-String) -notmatch "WSL_READY")) {
+    Stop-WithMessage "$Distro n'a pas pu etre initialise automatiquement. Regarde l'erreur WSL affichee ci-dessus."
+  }
 }
+
+$logFileName = [System.IO.Path]::GetFileName($LogFile)
 
 Write-Step "Lancement de setup.sh dans $Distro"
+Write-Host "Journal: $LogFile"
 Write-Host "La saisie reste active dans cette fenêtre."
 Write-Host "Le script indiquera clairement si le mot de passe Linux est nécessaire."
 $setupExitCode = Invoke-InteractiveWslSetup `
   -Distribution $Distro `
   -WorkingDirectory $scriptDir `
-  -LinuxLogFile $linuxLogFile
+  -LogFileName $logFileName
 
 if ($setupExitCode -ne 0) {
   Stop-WithMessage "setup.sh a echoue dans WSL. Regarde le message d'erreur ci-dessus."
 }
 
 Write-Host ""
-Write-Host "Installation terminee."
+Write-Host "Installation et tests termines avec succes." -ForegroundColor Green
+Write-Host ("Duree totale: {0:hh\:mm\:ss}" -f ((Get-Date) - $StartedAt))
 Write-Host "Log complet: $LogFile"

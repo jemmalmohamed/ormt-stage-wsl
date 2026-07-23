@@ -38,7 +38,7 @@ compose_up "$ORMT_API_DIR" \
   -f ./docker/services/nextcloud/docker-compose.nextcloud.stage.yml
 
 wait_for_container_health ormt-database 60
-wait_for_url "MinIO" "http://127.0.0.1:9000/minio/health/live" 60
+wait_for_container_health minio-ormt 60
 wait_for_url "Keycloak" "http://127.0.0.1:8092/realms/master" 60
 wait_for_host_route "Nextcloud" "ormt-nextcloud.localhost" "/status.php" 90
 
@@ -47,7 +47,21 @@ MVN_ARGS=(clean install)
 if [ "$ORMT_SKIP_TESTS" = "true" ]; then
   MVN_ARGS+=( -DskipTests )
 fi
-(cd "$ORMT_API_DIR" && sh scripts/verify-separation.sh)
+
+VERIFY_SEPARATION_SCRIPT=""
+if [ -f "$ORMT_API_DIR/scripts/verify-separation.sh" ]; then
+  VERIFY_SEPARATION_SCRIPT="$ORMT_API_DIR/scripts/verify-separation.sh"
+else
+  VERIFY_SEPARATION_SCRIPT="$(find "$ORMT_API_DIR" -maxdepth 4 -type f -name 'verify-separation.sh' -print -quit)"
+fi
+
+if [ -n "$VERIFY_SEPARATION_SCRIPT" ]; then
+  log "Verification de la separation des APIs: $VERIFY_SEPARATION_SCRIPT"
+  (cd "$ORMT_API_DIR" && sh "$VERIFY_SEPARATION_SCRIPT")
+else
+  log "INFO: verify-separation.sh absent du depot API; controle ignore, validations Maven maintenues"
+fi
+
 (cd "$ORMT_API_DIR" && mvn -f ormt-core-api/pom.xml "${MVN_ARGS[@]}")
 (cd "$ORMT_API_DIR" && mvn -f ormt-content-api/pom.xml "${MVN_ARGS[@]}")
 

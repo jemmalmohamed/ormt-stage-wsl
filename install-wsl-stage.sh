@@ -29,7 +29,18 @@ log "Installation des collections Ansible"
 (cd "$ORMT_INFRA_DIR/ansible" && ansible-galaxy collection install -r requirements.yml)
 
 log "Installation de l'infra partagée avec Ansible"
-(cd "$ORMT_INFRA_DIR/ansible" && ansible-playbook -i inventory/hosts all.playbook.yml -e "username=$ORMT_LINUX_USER")
+ansible_args=(
+  -i inventory/hosts
+  all.playbook.yml
+  -e "username=$ORMT_LINUX_USER system_upgrade_packages=false docker_enable_tcp=false"
+)
+
+if [ "$ORMT_INSTALL_DEV_TOOLS" != "true" ]; then
+  log "Mode léger: Homepage, Portainer, monitoring et Jenkins sont ignorés"
+  ansible_args+=(--skip-tags homepage,portainer,monitoring,jenkins)
+fi
+
+(cd "$ORMT_INFRA_DIR/ansible" && ansible-playbook "${ansible_args[@]}")
 
 log "Validation Docker et proxy"
 sudo service docker start >/dev/null 2>&1 || true
@@ -52,6 +63,12 @@ if docker network inspect proxy >/dev/null 2>&1; then
 else
   sudo docker network inspect proxy >/dev/null
   sudo docker ps
+fi
+
+if [ "$ORMT_INSTALL_DEV_TOOLS" = "true" ]; then
+  printf 'complete\n' > "$ROOT_DIR/.infra-installed"
+else
+  printf 'light\n' > "$ROOT_DIR/.infra-installed"
 fi
 
 cat <<'MSG'

@@ -24,6 +24,9 @@ ORMT_WEB_DIR="$(cd "$ROOT_DIR" && mkdir -p "$(dirname "$ORMT_WEB_DIR")" && realp
 
 ORMT_LINUX_USER="${ORMT_LINUX_USER:-${USER:-}}"
 ORMT_SKIP_TESTS="${ORMT_SKIP_TESTS:-false}"
+ORMT_INSTALL_DEV_TOOLS="${ORMT_INSTALL_DEV_TOOLS:-true}"
+export COMPOSE_PROGRESS="${COMPOSE_PROGRESS:-plain}"
+export BUILDKIT_PROGRESS="${BUILDKIT_PROGRESS:-plain}"
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%H:%M:%S')" "$*"
@@ -97,11 +100,16 @@ wait_for_url() {
   local attempts="${3:-60}"
 
   log "Attente: $name"
-  until curl --fail --silent --show-error "$url" >/dev/null; do
+  until curl --fail --silent --show-error "$url" >/dev/null 2>&1; do
     attempts=$((attempts - 1))
-    [ "$attempts" -gt 0 ] || die "$name indisponible: $url"
+    [ "$attempts" -gt 0 ] || {
+      log "Diagnostic Docker apres echec de $name"
+      docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' >&2 || true
+      die "$name indisponible apres le delai d'attente: $url"
+    }
     sleep 2
   done
+  log "OK: $name"
 }
 
 wait_for_host_route() {
@@ -111,11 +119,16 @@ wait_for_host_route() {
   local attempts="${4:-60}"
 
   log "Attente: $name"
-  until curl --fail --silent --show-error --header "Host: $host" "http://127.0.0.1$path" >/dev/null; do
+  until curl --fail --silent --show-error --header "Host: $host" "http://127.0.0.1$path" >/dev/null 2>&1; do
     attempts=$((attempts - 1))
-    [ "$attempts" -gt 0 ] || die "$name indisponible: http://$host$path"
+    [ "$attempts" -gt 0 ] || {
+      log "Diagnostic Docker apres echec de $name"
+      docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' >&2 || true
+      die "$name indisponible apres le delai d'attente: http://$host$path"
+    }
     sleep 2
   done
+  log "OK: $name"
 }
 
 wait_for_container_health() {

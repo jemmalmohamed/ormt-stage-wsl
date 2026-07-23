@@ -53,7 +53,8 @@ Si la fenêtre affiche `Sélection ORMT Stage WSL Setup` dans la barre de titre,
 
 Le lanceur conserve maintenant le terminal directement connecté à WSL. La
 saisie du mot de passe fonctionne normalement et les lignes de log restent
-alignées.
+alignées. Le script `run-wsl-stage.sh` assure la copie des sorties vers le
+journal Windows, y compris lorsque le chemin du dossier contient des espaces.
 
 Alternatives Windows :
 
@@ -78,7 +79,7 @@ Le script s'occupe de :
 - activer `systemd` si nécessaire ;
 - installer les outils requis ;
 - cloner les 3 dépôts applicatifs s'ils sont absents ;
-- installer Docker, Traefik, Jenkins et le réseau `proxy` ;
+- installer Docker, Traefik et le réseau `proxy` ;
 - démarrer les services Stage ;
 - afficher le diagnostic final.
 
@@ -112,6 +113,14 @@ Ne fais pas `Ctrl+C` pour rafraîchir le log. Cela arrête l'installation.
 - MinIO : http://localhost:9000
 - Jenkins : http://jenkins.localhost
 - Traefik : http://traefik.localhost
+
+Les outils supplémentaires Homepage, Portainer, Prometheus, Grafana et Jenkins
+sont ignorés par défaut pour alléger l’installation. Pour les installer aussi,
+ajoute dans `.env` :
+
+```text
+ORMT_INSTALL_DEV_TOOLS=true
+```
 
 Si le navigateur Windows n'ouvre pas les domaines `.localhost`, ajoute ces lignes dans `C:\Windows\System32\drivers\etc\hosts` :
 
