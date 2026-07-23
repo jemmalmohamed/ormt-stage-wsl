@@ -39,11 +39,21 @@ Depuis PowerShell Windows, utilise :
 .\setup.bat
 ```
 
+Sur une machine neuve, ouvre d’abord **Ubuntu 24.04** depuis le menu Démarrer
+et termine la création de l’utilisateur Linux. Ferme ensuite Ubuntu et lance
+`setup.bat`.
+
 La fenêtre affiche les logs en direct et garde une copie dans le dossier `logs`.
+
+À l’étape `ACTION REQUISE`, tape simplement le mot de passe de l’utilisateur
+Ubuntu, puis appuie sur `Entrée`. Le curseur ne bouge pas et aucun caractère
+ne s’affiche pendant la saisie : le mot de passe est quand même pris en compte.
 
 Si la fenêtre affiche `Sélection ORMT Stage WSL Setup` dans la barre de titre, l'installation est en pause parce que tu as cliqué dans la fenêtre noire. Appuie sur `Échap` pour reprendre.
 
-Quand le mot de passe `sudo` est demandé, saisis le mot de passe Linux. Il ne s'affiche pas à l'écran pendant la saisie, c'est normal.
+Le lanceur conserve maintenant le terminal directement connecté à WSL. La
+saisie du mot de passe fonctionne normalement et les lignes de log restent
+alignées.
 
 Alternatives Windows :
 
@@ -136,6 +146,10 @@ Les logs Windows sont écrits ici :
 ormt-stage-wsl\logs\
 ```
 
+En cas d’échec, la fin du log affiche la commande, la ligne et le code erreur.
+Il est possible de relancer `setup.bat` : les composants déjà installés sont
+détectés et réutilisés.
+
 Depuis PowerShell Windows, la commande principale est :
 
 ```powershell
@@ -145,6 +159,13 @@ Depuis PowerShell Windows, la commande principale est :
 `reset-stage.sh` est destructif pour les données ORMT Stage. Il ne supprime pas Traefik.
 
 ## 5. Dépannage rapide
+
+Si le lanceur indique qu’Ubuntu n’est pas encore initialisé :
+
+1. ouvre **Ubuntu 24.04** depuis le menu Démarrer ;
+2. attends la fin de l’initialisation ;
+3. crée le nom d’utilisateur et le mot de passe Linux demandés ;
+4. ferme Ubuntu, puis relance `setup.bat`.
 
 Si tu vois :
 

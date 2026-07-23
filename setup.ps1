@@ -56,11 +56,25 @@ function Write-Step {
 function Stop-WithMessage {
   param([string]$Message)
   Write-Host ""
-  Write-Error $Message
+  Write-Host "ERREUR: $Message" -ForegroundColor Red
   Add-Content -Path $LogFile -Value "ERREUR: $Message"
   Write-Host ""
   Write-Host "Log complet: $LogFile"
   exit 1
+}
+
+function Convert-ToWslPath {
+  param([string]$WindowsPath)
+
+  $fullPath = [System.IO.Path]::GetFullPath($WindowsPath)
+  $pathRoot = [System.IO.Path]::GetPathRoot($fullPath)
+  if (-not $pathRoot -or $pathRoot.Length -lt 2 -or $pathRoot[1] -ne ':') {
+    throw "Chemin Windows non pris en charge: $fullPath"
+  }
+
+  $drive = $pathRoot.Substring(0, 1).ToLowerInvariant()
+  $relativePath = $fullPath.Substring($pathRoot.Length).Replace('\', '/')
+  return "/mnt/$drive/$relativePath"
 }
 
 function Invoke-LoggedProcess {
@@ -74,6 +88,27 @@ function Invoke-LoggedProcess {
     Write-Host $line
     Add-Content -Path $LogFile -Value $line
   }
+
+  return $LASTEXITCODE
+}
+
+function Invoke-InteractiveWslSetup {
+  param(
+    [string]$Distribution,
+    [string]$WorkingDirectory,
+    [string]$LinuxLogFile
+  )
+
+  $command = @'
+chmod +x ./setup.sh ./setup-after-docker-group.sh ./install-wsl-stage.sh ./start-stage.sh ./status-stage.sh ./stop-stage.sh ./reset-stage.sh ./scripts/common.sh 2>/dev/null || true
+set -o pipefail
+./setup.sh 2>&1 | tee -a "$ORMT_WINDOWS_LOG"
+exit "${PIPESTATUS[0]}"
+'@
+
+  # Appel direct indispensable : stdin reste relié au terminal pour sudo.
+  & wsl.exe -d $Distribution --cd $WorkingDirectory -- `
+    env "ORMT_WINDOWS_LOG=$LinuxLogFile" bash -lc $command
 
   return $LASTEXITCODE
 }
@@ -108,21 +143,26 @@ if (-not $hasDistro) {
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$linuxDir = (& wsl.exe -d $Distro --cd "$scriptDir" -- pwd).Trim()
-if (-not $linuxDir) {
-  Stop-WithMessage "Impossible de convertir le chemin Windows vers WSL: $scriptDir"
+$linuxDirOutput = & wsl.exe -d $Distro --cd "$scriptDir" -- pwd
+if ($LASTEXITCODE -ne 0 -or -not $linuxDirOutput) {
+  Stop-WithMessage "Ubuntu n'est pas encore initialisé. Ouvre $Distro depuis le menu Démarrer, crée l'utilisateur Linux, puis relance setup.bat."
+}
+$linuxDir = ($linuxDirOutput | Out-String).Trim()
+
+try {
+  $linuxLogFile = Convert-ToWslPath -WindowsPath $LogFile
+}
+catch {
+  Stop-WithMessage "Impossible de préparer le fichier de log WSL: $($_.Exception.Message)"
 }
 
 Write-Step "Lancement de setup.sh dans $Distro"
-Write-Host "Si le mot de passe sudo est demandé, saisis le mot de passe Linux puis appuie sur Entrée."
-Write-Host "Le mot de passe ne s'affiche pas pendant la saisie, c'est normal."
-$setupExitCode = Invoke-LoggedProcess -FilePath "wsl.exe" -Arguments @(
-  "-d", $Distro,
-  "--cd", $scriptDir,
-  "--",
-  "bash", "-lc",
-  "chmod +x ./setup.sh ./setup-after-docker-group.sh ./install-wsl-stage.sh ./start-stage.sh ./status-stage.sh ./stop-stage.sh ./reset-stage.sh ./scripts/common.sh 2>/dev/null || true; ./setup.sh"
-)
+Write-Host "La saisie reste active dans cette fenêtre."
+Write-Host "Le script indiquera clairement si le mot de passe Linux est nécessaire."
+$setupExitCode = Invoke-InteractiveWslSetup `
+  -Distribution $Distro `
+  -WorkingDirectory $scriptDir `
+  -LinuxLogFile $linuxLogFile
 
 if ($setupExitCode -ne 0) {
   Stop-WithMessage "setup.sh a echoue dans WSL. Regarde le message d'erreur ci-dessus."

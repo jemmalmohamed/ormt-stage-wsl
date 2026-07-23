@@ -15,6 +15,22 @@ die() {
   exit 1
 }
 
+show_failure() {
+  local exit_code=$?
+  local line="$1"
+  local command="$2"
+
+  printf '\n============================================================\n' >&2
+  printf 'ÉCHEC DE L’INSTALLATION\n' >&2
+  printf 'Étape/commande : %s\n' "$command" >&2
+  printf 'Ligne          : %s\n' "$line" >&2
+  printf 'Code erreur    : %s\n' "$exit_code" >&2
+  printf 'Relance setup.bat : les étapes déjà terminées seront réutilisées.\n' >&2
+  printf '============================================================\n' >&2
+}
+
+trap 'show_failure "$LINENO" "$BASH_COMMAND"' ERR
+
 run_with_heartbeat() {
   local label="$1"
   shift
@@ -75,9 +91,17 @@ if ! grep -q '^ORMT_LINUX_USER=' .env || grep -q '^ORMT_LINUX_USER=$' .env; then
 fi
 
 log "Vérification des droits sudo"
-echo "Si le mot de passe est demandé, saisis le mot de passe Linux de ${USER}, puis appuie sur Entrée."
-echo "Le mot de passe ne s'affiche pas pendant la saisie."
-sudo -v -p "[sudo] Mot de passe Linux pour %u: " || die "L'utilisateur ${USER} doit avoir les droits sudo."
+if sudo -n true 2>/dev/null; then
+  log "Droits administrateur déjà disponibles"
+else
+  printf '\n============================================================\n'
+  printf 'ACTION REQUISE\n'
+  printf 'Saisis maintenant le mot de passe Linux de %s.\n' "$USER"
+  printf 'Aucun caractère ne s’affichera pendant la saisie : c’est normal.\n'
+  printf 'Appuie ensuite sur Entrée.\n'
+  printf '============================================================\n\n'
+  sudo -v -p "[sudo] Mot de passe Linux pour %u : " || die "L'utilisateur ${USER} doit avoir les droits sudo."
+fi
 
 if [ ! -f /etc/wsl.conf ] || ! grep -q '^systemd=true' /etc/wsl.conf; then
   log "Activation de systemd dans WSL"
