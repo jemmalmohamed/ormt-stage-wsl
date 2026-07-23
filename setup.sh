@@ -70,18 +70,12 @@ run_with_heartbeat() {
 
 infra_ready() {
   local expected_mode="complete"
-  local api_branch="micro-service"
-  local web_branch="micro-service"
   if grep -q '^ORMT_INSTALL_DEV_TOOLS=false' .env 2>/dev/null; then
     expected_mode="light"
   fi
-  api_branch="$(sed -n 's/^ORMT_API_BRANCH=//p' .env | tail -n 1)"
-  web_branch="$(sed -n 's/^ORMT_WEB_BRANCH=//p' .env | tail -n 1)"
-  api_branch="${api_branch:-micro-service}"
-  web_branch="${web_branch:-micro-service}"
 
   [ -f .infra-installed ] || return 1
-  grep -Fqx "${expected_mode}|${api_branch}|${web_branch}" .infra-installed || return 1
+  grep -Eq "^${expected_mode}(\||$)" .infra-installed || return 1
   command -v docker >/dev/null 2>&1 || return 1
   timeout 10 docker network inspect proxy >/dev/null 2>&1 || return 1
   timeout 10 docker ps --format '{{.Names}}|{{.Image}}' | awk -F'|' 'tolower($2) ~ /traefik/ {found=1} END {exit found ? 0 : 1}'
@@ -139,15 +133,12 @@ if [ ! -f /etc/wsl.conf ] || ! grep -q '^systemd=true' /etc/wsl.conf; then
   printf '[boot]\nsystemd=true\n' | sudo tee /etc/wsl.conf >/dev/null
   cat <<'MSG'
 
+REDÉMARRAGE WSL REQUIS
 systemd vient d'être activé.
-Ferme Ubuntu, puis lance dans PowerShell:
-  wsl --shutdown
-
-Ensuite rouvre Ubuntu et relance:
-  cd ~/ormt-app/ormt-stage-wsl
-  ./setup.sh
+Le lanceur Windows va arrêter WSL puis reprendre automatiquement l'installation.
 MSG
-  exit 0
+  # Code reserve, interprete par setup.ps1 pour redemarrer WSL.
+  exit 42
 fi
 
 if infra_ready; then
@@ -155,6 +146,9 @@ if infra_ready; then
 else
   run_with_heartbeat "Installation et configuration ORMT Stage" ./install-wsl-stage.sh
 fi
+
+log "Synchronisation des depots applicatifs"
+./sync-repositories.sh
 
 if command -v docker >/dev/null 2>&1; then
   log "Démarrage de Docker si nécessaire"

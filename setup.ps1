@@ -175,10 +175,50 @@ Write-Step "Lancement de setup.sh dans $Distro"
 Write-Host "Journal: $LogFile"
 Write-Host "La saisie reste active dans cette fenêtre."
 Write-Host "Le script indiquera clairement si le mot de passe Linux est nécessaire."
-$setupExitCode = Invoke-InteractiveWslSetup `
-  -Distribution $Distro `
-  -WorkingDirectory $scriptDir `
-  -LogFileName $logFileName
+$setupExitCode = 1
+$maxWslRestarts = 2
+for ($runNumber = 1; $runNumber -le ($maxWslRestarts + 1); $runNumber++) {
+  $setupExitCode = Invoke-InteractiveWslSetup `
+    -Distribution $Distro `
+    -WorkingDirectory $scriptDir `
+    -LogFileName $logFileName
+
+  if ($setupExitCode -ne 42) {
+    break
+  }
+
+  if ($runNumber -gt $maxWslRestarts) {
+    Stop-WithMessage "WSL demande encore un redemarrage apres $maxWslRestarts tentatives."
+  }
+
+  Write-Step "Redemarrage WSL requis - tentative $runNumber/$maxWslRestarts"
+  Write-Host "Arret automatique de toutes les distributions WSL..." -ForegroundColor Yellow
+  Add-Content -Path $LogFile -Value "Execution: wsl.exe --shutdown"
+  & wsl.exe --shutdown
+  if ($LASTEXITCODE -ne 0) {
+    Stop-WithMessage "Impossible d'arreter WSL automatiquement."
+  }
+
+  Write-Host "Attente du redemarrage de $Distro..."
+  Start-Sleep -Seconds 4
+
+  $restartReady = $false
+  for ($restartAttempt = 1; $restartAttempt -le 5; $restartAttempt++) {
+    $probeOutput = & wsl.exe -d $Distro -- sh -lc "id -u && printf WSL_READY" 2>$null
+    if ($LASTEXITCODE -eq 0 -and (($probeOutput | Out-String) -match "WSL_READY")) {
+      $restartReady = $true
+      break
+    }
+    Write-Host "Demarrage de WSL ($restartAttempt/5)..." -ForegroundColor Yellow
+    Start-Sleep -Seconds 2
+  }
+
+  if (-not $restartReady) {
+    Stop-WithMessage "$Distro ne redemarre pas apres wsl --shutdown."
+  }
+
+  Write-Step "WSL redemarre - reprise automatique de l'installation"
+}
 
 if ($setupExitCode -ne 0) {
   Stop-WithMessage "setup.sh a echoue dans WSL. Regarde le message d'erreur ci-dessus."

@@ -7,7 +7,8 @@ LOG_FILE="./logs/${LOG_NAME}"
 mkdir -p ./logs
 chmod +x ./setup.sh ./setup-after-docker-group.sh ./install-wsl-stage.sh \
   ./start-stage.sh ./status-stage.sh ./stop-stage.sh ./reset-stage.sh \
-  ./test-infrastructure.sh ./test-stage.sh ./scripts/common.sh 2>/dev/null || true
+  ./sync-repositories.sh ./test-infrastructure.sh ./test-stage.sh \
+  ./scripts/common.sh 2>/dev/null || true
 
 # Force les outils Python/Ansible a emettre leurs lignes immediatement.
 export PYTHONUNBUFFERED=1

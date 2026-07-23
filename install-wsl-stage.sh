@@ -78,7 +78,7 @@ if [ "$ORMT_INSTALL_DEV_TOOLS" = "true" ]; then
 else
   install_mode="light"
 fi
-printf '%s|%s|%s\n' "$install_mode" "$ORMT_API_BRANCH" "$ORMT_WEB_BRANCH" > "$ROOT_DIR/.infra-installed"
+printf '%s\n' "$install_mode" > "$ROOT_DIR/.infra-installed"
 
 cat <<'MSG'
 
