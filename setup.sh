@@ -105,6 +105,14 @@ if [ ! -f .env ]; then
   cp .env.example .env
 fi
 
+# Le projet peut être lancé depuis cmd.exe sur Windows puis copié dans WSL.
+# Dans ce cas Git/Windows peut conserver des fins de ligne CRLF. Un fichier
+# .env est ensuite lu par Bash : le \r final ferait échouer son interprétation.
+if grep -q $'\r' .env 2>/dev/null; then
+  log "Conversion du fichier .env au format Linux (LF)"
+  sed -i 's/\r$//' .env
+fi
+
 if ! grep -q '^ORMT_LINUX_USER=' .env || grep -q '^ORMT_LINUX_USER=$' .env; then
   log "Configuration automatique de l'utilisateur Linux: ${USER}"
   if grep -q '^ORMT_LINUX_USER=' .env; then
