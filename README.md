@@ -1,223 +1,166 @@
-# ORMT Stage WSL
+# Installateur ORMT Stage pour Windows et WSL
 
-Point d'entrée simple pour installer et démarrer ORMT Stage dans Ubuntu WSL.
+Cet installateur prépare une infrastructure complète sous Ubuntu WSL, la
+valide, puis installe et teste le Stage métier ORMT.
 
-## 1. Si Ubuntu WSL n'est pas encore installé
+Le profil développeur est activé par défaut. Il comprend Traefik, Portainer,
+Jenkins, Homepage, Grafana, Prometheus, cAdvisor et Node Exporter.
 
-Depuis PowerShell en administrateur :
+## Parcours recommandé
 
-```powershell
-wsl --install -d Ubuntu-24.04
-```
-
-Redémarre Windows si demandé, puis ouvre **Ubuntu 24.04** depuis le menu Démarrer.
-
-Au premier lancement, crée l'utilisateur Linux quand Ubuntu le demande. Utilise un nom simple, sans espace ni accent, par exemple :
+Double-clique sur :
 
 ```text
-ormt
+03-Installer-Tout.bat
 ```
 
-Vérifie ensuite :
+L'installateur effectue automatiquement :
 
-```bash
-whoami
-sudo whoami
-```
+1. la préparation d'Ubuntu WSL et de `systemd` ;
+2. l'installation de l'infrastructure complète ;
+3. le redémarrage de WSL lorsque le groupe Docker doit être actualisé ;
+4. la validation de l'infrastructure ;
+5. la construction et le démarrage du Stage métier ;
+6. les tests HTTP finaux.
 
-Le deuxième résultat doit être :
+Aucune relance manuelle n'est requise après l'ajout au groupe Docker.
+
+## Menu guidé
+
+`Installer-ORMT.bat` propose :
 
 ```text
-root
+1. Installation complète recommandée
+2. Infrastructure uniquement
+3. Stage métier uniquement
+4. Vérifier l'installation
+5. Réparer ou reprendre
+6. Configuration
+0. Quitter
 ```
 
-## 2. Lancer l'installation automatique
+Les raccourcis disponibles à la racine sont :
 
-Depuis PowerShell Windows, utilise :
+```text
+01-Installer-Infrastructure.bat
+02-Installer-Stage-Metier.bat
+03-Installer-Tout.bat
+04-Verifier-Installation.bat
+```
+
+`setup.bat` et `setup.cmd` sont conservés comme alias de compatibilité.
+
+## Provenance des projets
+
+### Détection automatique
+
+Le mode utilisé par défaut recherche les trois projets dans `sources/`. Si les
+trois dossiers sont valides, ils sont copiés vers WSL. Sinon, les dépôts Git
+sont clonés ou mis à jour.
+
+### Dossiers fournis
+
+Place les projets ainsi :
+
+```text
+sources/
+├── ormt-infra-stage-local-vps/
+├── ormt-api/
+└── ormt-web-v1/
+```
+
+Les dossiers `.git` ne sont pas obligatoires. Les projets Windows ne sont
+jamais compilés directement depuis `/mnt/c` ou `/mnt/d` : une copie est créée
+dans `~/ormt-app/` pour conserver les performances Linux.
+
+Ce mode évite Git, mais nécessite toujours Internet pour Ubuntu, Maven, npm et
+les images Docker.
+
+### Git
+
+Les URLs et branches se configurent dans `config/.env`. Le mode Git refuse
+d'écraser les modifications locales et utilise uniquement des mises à jour
+`fast-forward`.
+
+## Configuration
+
+Dans le menu, sélectionne `6. Configuration`. Le fichier `config/.env` est créé
+depuis `config/.env.example`, puis ouvert dans le Bloc-notes.
+
+Valeurs principales :
+
+```text
+ORMT_SOURCE_MODE=auto
+ORMT_INSTALL_DEV_TOOLS=true
+ORMT_SKIP_TESTS=false
+ORMT_DOCKER_PULL_PARALLEL=4
+```
+
+Lors d'une première installation, les images de l'infrastructure sont
+téléchargées avec une progression visible et jusqu'à quatre téléchargements
+simultanés. Les relances réutilisent les images déjà présentes.
+
+Les images PostgreSQL, Keycloak, MinIO et Nextcloud sont également préchargées
+en parallèle. Les deux API sont compilées simultanément avec le cache Maven
+persistant de WSL, puis seules leurs images d'exécution sont assemblées.
+
+L'état persistant est conservé dans :
+
+```text
+~/.local/state/ormt-stage/
+```
+
+Une mise à jour de l'installateur ne supprime pas cet état ni les volumes
+Docker.
+
+## Commandes avancées
+
+Depuis PowerShell :
 
 ```powershell
-.\setup.bat
+.\installer\windows\setup.ps1 -Mode Full -SourceMode Auto
+.\installer\windows\setup.ps1 -Mode Infrastructure -SourceMode Provided
+.\installer\windows\setup.ps1 -Mode Stage -SourceMode Git
+.\installer\windows\setup.ps1 -Mode Diagnostic
+.\installer\windows\setup.ps1 -Mode Repair -SourceMode Auto
 ```
 
-Sur une machine neuve, ouvre d’abord **Ubuntu 24.04** depuis le menu Démarrer
-et termine la création de l’utilisateur Linux. Ferme ensuite Ubuntu et lance
-`setup.bat`.
-
-La fenêtre affiche les logs en direct et garde une copie dans le dossier `logs`.
-
-À l’étape `ACTION REQUISE`, tape simplement le mot de passe de l’utilisateur
-Ubuntu, puis appuie sur `Entrée`. Le curseur ne bouge pas et aucun caractère
-ne s’affiche pendant la saisie : le mot de passe est quand même pris en compte.
-
-Si la fenêtre affiche `Sélection ORMT Stage WSL Setup` dans la barre de titre, l'installation est en pause parce que tu as cliqué dans la fenêtre noire. Appuie sur `Échap` pour reprendre.
-
-Le lanceur conserve maintenant le terminal directement connecté à WSL. La
-saisie du mot de passe fonctionne normalement et les lignes de log restent
-alignées. Le script `run-wsl-stage.sh` assure la copie des sorties vers le
-journal Windows, y compris lorsque le chemin du dossier contient des espaces.
-
-Alternatives Windows :
-
-```powershell
-.\setup.cmd
-.\setup.ps1
-```
-
-Depuis Ubuntu WSL, utilise :
-
-```bash
-./setup.sh
-```
-
-N'utilise pas `./setup.sh` directement dans PowerShell. C'est un script Linux.
-
-Le script s'occupe de :
-
-- copier le dossier vers `~/ormt-app/ormt-stage-wsl` si besoin ;
-- créer `.env` ;
-- configurer l'utilisateur Linux courant ;
-- activer `systemd` si nécessaire ;
-- installer les outils requis ;
-- cloner les 3 dépôts applicatifs s'ils sont absents ;
-- installer Docker, Traefik et le réseau `proxy` ;
-- démarrer les services Stage ;
-- afficher le diagnostic final.
-
-Si `systemd` vient d'être activé, le script s'arrête. Lance alors depuis PowerShell :
-
-```powershell
-wsl --shutdown
-```
-
-Puis rouvre Ubuntu et relance :
+Depuis Ubuntu WSL, après installation :
 
 ```bash
 cd ~/ormt-app/ormt-stage-wsl
-./setup.sh
+./installer/wsl/commands/status-stage.sh
+./installer/wsl/commands/start-stage.sh
+./installer/wsl/commands/stop-stage.sh
+./installer/wsl/commands/reset-stage.sh
 ```
 
-Pendant les étapes longues, comme l'installation Ansible ou Docker, le script affiche régulièrement :
+`reset-stage.sh` est destructif et demande de saisir `RESET`. Il n'est jamais
+appelé automatiquement.
 
-```text
-Installation et configuration ORMT Stage toujours en cours
-```
-
-Ne fais pas `Ctrl+C` pour rafraîchir le log. Cela arrête l'installation.
-
-## 3. URLs après démarrage
+## URLs principales
 
 - Frontend : http://ormt-web.localhost
 - API : http://ormt-core-api.localhost/api/v1
-- Swagger API : http://ormt-core-api.localhost/v3/api-docs
+- Swagger : http://ormt-core-api.localhost/v3/api-docs
 - Keycloak : http://localhost:8092
 - MinIO : http://localhost:9000
-- Jenkins : http://jenkins.localhost
 - Traefik : http://traefik.localhost
+- Portainer : http://portainer.localhost
+- Jenkins : http://jenkins.localhost
+- Homepage : http://lab.localhost
+- Grafana : http://grafana.localhost
+- Prometheus : http://prometheus.localhost
 
-Les outils supplémentaires Homepage, Portainer, Prometheus, Grafana et Jenkins
-sont ignorés par défaut pour alléger l’installation. Pour les installer aussi,
-ajoute dans `.env` :
+## Journaux et reprise
 
-```text
-ORMT_INSTALL_DEV_TOOLS=true
-```
+Les journaux sont écrits dans `logs/`. Chaque phase affiche sa durée.
 
-Si le navigateur Windows n'ouvre pas les domaines `.localhost`, ajoute ces lignes dans `C:\Windows\System32\drivers\etc\hosts` :
+En cas d'interruption, relance le même BAT. Les contrôles réels déterminent les
+phases à reprendre. Les volumes et données Stage sont conservés.
 
-```text
-127.0.0.1 traefik.localhost
-127.0.0.1 lab.localhost
-127.0.0.1 jenkins.localhost
-127.0.0.1 portainer.localhost
-127.0.0.1 grafana.localhost
-127.0.0.1 prometheus.localhost
-127.0.0.1 ormt-web.localhost
-127.0.0.1 ormt-core-api.localhost
-127.0.0.1 ormt-kc.localhost
-127.0.0.1 ormt-nextcloud.localhost
-127.0.0.1 ormt-minio-console.localhost
-127.0.0.1 ormt-minio-api.localhost
-```
-
-## 4. Commandes utiles
-
-```bash
-./setup.sh          # installation complète automatique depuis Ubuntu WSL
-./start-stage.sh    # démarrer ou redémarrer Stage
-./status-stage.sh   # vérifier l'état
-./stop-stage.sh     # arrêter sans supprimer les données
-./reset-stage.sh    # supprimer les conteneurs et volumes Stage
-```
-
-Les logs Windows sont écrits ici :
+Le message final suivant signifie que tous les contrôles demandés sont passés :
 
 ```text
-ormt-stage-wsl\logs\
-```
-
-En cas d’échec, la fin du log affiche la commande, la ligne et le code erreur.
-Il est possible de relancer `setup.bat` : les composants déjà installés sont
-détectés et réutilisés.
-
-Depuis PowerShell Windows, la commande principale est :
-
-```powershell
-.\setup.bat
-```
-
-`reset-stage.sh` est destructif pour les données ORMT Stage. Il ne supprime pas Traefik.
-
-## 5. Dépannage rapide
-
-Si le lanceur indique qu’Ubuntu n’est pas encore initialisé :
-
-1. ouvre **Ubuntu 24.04** depuis le menu Démarrer ;
-2. attends la fin de l’initialisation ;
-3. crée le nom d’utilisateur et le mot de passe Linux demandés ;
-4. ferme Ubuntu, puis relance `setup.bat`.
-
-Si tu vois :
-
-```text
-bash: ./setup.sh: No such file or directory
-```
-
-Tu n'es pas dans le bon dossier. Retrouve le script :
-
-```bash
-find /mnt/c/Users/admin -maxdepth 5 -type f -name setup.sh
-```
-
-Puis va dans le dossier trouvé :
-
-```bash
-cd /mnt/c/Users/admin/chemin/vers/ormt-stage-wsl
-./setup.sh
-```
-
-Si Docker affiche `permission denied`, lance :
-
-```bash
-newgrp docker
-docker ps
-```
-
-Si Docker ne démarre pas, relance :
-
-```bash
-sudo service docker start
-./status-stage.sh
-```
-
-Si tu vois des logs VS Code comme :
-
-```text
-[main ...] StorageMainService
-[main ...] update#setState
-```
-
-Tu as lancé `setup.sh` depuis PowerShell ou Windows a ouvert le fichier avec VS Code. Relance avec :
-
-```powershell
-.\setup.bat
+SUCCÈS — mode Full terminé et validé
 ```
