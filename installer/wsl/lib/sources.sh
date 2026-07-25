@@ -143,27 +143,50 @@ sync_git_project() {
   if test -d "$dir/.git"; then
     test -z "$(git -C "$dir" status --porcelain)" ||
       die "$name contient des modifications locales: $dir"
+
+    local target_ref=""
     if test -n "$branch"; then
       log "Mise à jour de $name sur $branch"
-      git -C "$dir" fetch --progress --depth 1 origin "$branch"
+      if test "$(git -C "$dir" rev-parse --is-shallow-repository)" = "true"; then
+        log "Approfondissement léger de l'historique Git superficiel"
+        git -C "$dir" fetch --progress --deepen 20 origin "$branch"
+      else
+        git -C "$dir" fetch --progress origin "$branch"
+      fi
       if git -C "$dir" show-ref --verify --quiet "refs/heads/$branch"; then
         git -C "$dir" checkout "$branch"
       else
         git -C "$dir" checkout -b "$branch" --track "origin/$branch"
       fi
-      git -C "$dir" pull --ff-only --progress origin "$branch"
+      target_ref="origin/$branch"
     else
       log "Mise à jour de $name"
-      git -C "$dir" pull --ff-only --progress
+      branch="$(git -C "$dir" symbolic-ref --quiet --short HEAD)"
+      test -n "$branch" || die "$name est positionné sur un commit détaché."
+      if test "$(git -C "$dir" rev-parse --is-shallow-repository)" = "true"; then
+        log "Approfondissement léger de l'historique Git superficiel"
+        git -C "$dir" fetch --progress --deepen 20 origin "$branch"
+      else
+        git -C "$dir" fetch --progress origin "$branch"
+      fi
+      target_ref="origin/$branch"
+    fi
+
+    if git -C "$dir" merge-base --is-ancestor HEAD "$target_ref"; then
+      git -C "$dir" merge --ff-only "$target_ref"
+    elif git -C "$dir" merge-base --is-ancestor "$target_ref" HEAD; then
+      log "$name contient des commits locaux supplémentaires; aucun écrasement effectué"
+    else
+      die "$name a réellement divergé de $target_ref. Les commits locaux sont conservés dans: $dir"
     fi
   elif test -e "$dir"; then
     die "$name existe sans être un dépôt Git: $dir"
   elif test -n "$branch"; then
     log "Clonage de $name, branche $branch"
-    git clone --progress --depth 1 --branch "$branch" --single-branch "$url" "$dir"
+    git clone --progress --depth 20 --branch "$branch" --single-branch "$url" "$dir"
   else
     log "Clonage de $name"
-    git clone --progress --depth 1 "$url" "$dir"
+    git clone --progress --depth 20 "$url" "$dir"
   fi
 
   printf '  %s: %s\n' "$name" "$(git -C "$dir" rev-parse --short HEAD)"
