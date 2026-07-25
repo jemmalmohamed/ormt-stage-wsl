@@ -13,6 +13,9 @@ require_docker_ready
 need_cmd curl
 verify_proxy
 
+mapfile -t api_args < <(api_service_compose_args)
+(cd "$ORMT_API_DIR" && docker compose "${api_args[@]}" config --quiet)
+
 set_progress "Services métier — téléchargement parallèle des images Docker"
 log "Préchargement parallèle des images des services métier"
 prefetch_docker_images \
@@ -40,7 +43,7 @@ compose_up "$ORMT_API_DIR" \
 
 wait_for_container_health ormt-database 60
 wait_for_container_health minio-ormt 60
-wait_for_url "Keycloak (realm ORMT)" "http://127.0.0.1:8092/realms/ormt" 90
+wait_for_url "Keycloak (realm master)" "http://127.0.0.1:8092/realms/master" 90
 wait_for_host_route "Nextcloud" "ormt-nextcloud.localhost" "/status.php" 90
 
 api_fingerprint="$(source_fingerprint "$ORMT_API_DIR")"
@@ -56,12 +59,12 @@ else
   log "Compilation parallèle des API Core et Content (cache Maven partagé)"
   (
     cd "$ORMT_API_DIR/ormt-core-api"
-    ./mvnw "${maven_args[@]}"
+    bash ./mvnw "${maven_args[@]}"
   ) &
   core_pid=$!
   (
     cd "$ORMT_API_DIR/ormt-content-api"
-    ./mvnw "${maven_args[@]}"
+    bash ./mvnw "${maven_args[@]}"
   ) &
   content_pid=$!
 
@@ -69,17 +72,26 @@ else
   content_status=0
   wait "$core_pid" || core_status=$?
   wait "$content_pid" || content_status=$?
-  test "$core_status" -eq 0 || die "Échec de compilation de l'API Core"
-  test "$content_status" -eq 0 || die "Échec de compilation de l'API Content"
+  if test "$core_status" -ne 0 || test "$content_status" -ne 0; then
+    die "Échec de compilation Maven (Core=$core_status, Content=$content_status)"
+  fi
+
+  core_jar="$ORMT_API_DIR/ormt-core-api/target/ormt-core-api.jar"
+  mapfile -t content_jars < <(find "$ORMT_API_DIR/ormt-content-api/target" -maxdepth 1 \
+    -type f -name 'ormt-content-api-*.jar' -print)
+  test -s "$core_jar" || die "JAR Core absent après compilation: $core_jar"
+  test "${#content_jars[@]}" -eq 1 ||
+    die "Un seul JAR Content était attendu, trouvé: ${#content_jars[@]}"
+  test -s "${content_jars[0]}" || die "JAR Content vide: ${content_jars[0]}"
 
   set_progress "API Core + Content — création parallèle des images Docker d'exécution"
   log "Création parallèle des images d'exécution API"
-  (cd "$ORMT_API_DIR/ormt-core-api" &&
+  (cd "$ORMT_API_DIR" &&
     docker build \
       --file "$WSL_ROOT/templates/ormt-core-api.runtime.Dockerfile" \
       --tag ormt/ormt-core-api:latest .) &
   core_image_pid=$!
-  (cd "$ORMT_API_DIR/ormt-content-api" &&
+  (cd "$ORMT_API_DIR" &&
     docker build \
       --file "$WSL_ROOT/templates/ormt-content-api.runtime.Dockerfile" \
       --tag ormt/ormt-content-api:latest .) &
@@ -89,19 +101,21 @@ else
   content_image_status=0
   wait "$core_image_pid" || core_image_status=$?
   wait "$content_image_pid" || content_image_status=$?
-  test "$core_image_status" -eq 0 || die "Échec de création de l'image API Core"
-  test "$content_image_status" -eq 0 || die "Échec de création de l'image API Content"
+  if test "$core_image_status" -ne 0 || test "$content_image_status" -ne 0; then
+    die "Échec de création des images Docker (Core=$core_image_status, Content=$content_image_status)"
+  fi
   mark_build api "$api_fingerprint"
 fi
 
 set_progress "API Core + Content — création et démarrage des conteneurs"
 log "Démarrage des APIs"
-mapfile -t api_args < <(api_service_compose_args)
 (cd "$ORMT_API_DIR" &&
   docker compose "${api_args[@]}" up -d --force-recreate --remove-orphans)
 
 wait_for_host_route "API Core" "ormt-core-api.localhost" "/v3/api-docs" 90
+wait_for_url "Keycloak (realm ORMT configuré par Core API)" "http://127.0.0.1:8092/realms/ormt" 90
 wait_for_host_route "API Content" "ormt-content-api.localhost" "/api/v1/public/partenaires" 90
+wait_for_host_route "API Content Publications" "ormt-content-api.localhost" "/api/v1/public/publications?pageSize=1" 90
 
 web_fingerprint="$(source_fingerprint "$ORMT_WEB_DIR")"
 if build_is_current web "$web_fingerprint" && web_image_exists; then
@@ -130,7 +144,8 @@ cat <<'MSG'
 
 Stage démarré.
   Frontend : http://ormt-web.localhost
-  API      : http://ormt-core-api.localhost/api/v1
+  API Core : http://ormt-core-api.localhost/api/v1
+  API Content : http://ormt-content-api.localhost/api/v1
   Keycloak : http://localhost:8092
   MinIO    : http://localhost:9000
 MSG

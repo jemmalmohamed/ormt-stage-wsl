@@ -1,12 +1,14 @@
 param(
-  [ValidateSet("Full", "Infrastructure", "Stage", "Diagnostic", "Repair")]
+  [ValidateSet("Full", "Infrastructure", "Stage", "Diagnostic", "Repair", "ResetStage", "RemoveWsl", "RestartWsl")]
   [string]$Mode = "Full",
 
   [ValidateSet("Auto", "Provided", "Git")]
   [string]$SourceMode = "Auto",
 
   [string]$ProvidedSourcesDir = "",
-  [string]$Distro = "Ubuntu-24.04"
+  [string]$Distro = "Ubuntu-24.04",
+
+  [switch]$ConfirmDestructive
 )
 
 $ErrorActionPreference = "Stop"
@@ -101,11 +103,21 @@ function Invoke-WslInstaller {
 function Restart-WslDistribution {
   param([string]$Reason)
   Write-Step "Redemarrage automatique de WSL - $Reason"
-  Add-Content -LiteralPath $LogFile -Value "Execution: wsl.exe --terminate $Distro" -Encoding UTF8
-  & wsl.exe --terminate $Distro
-  if ($LASTEXITCODE -ne 0) {
-    Stop-WithMessage "Impossible d'arreter la distribution $Distro."
+  $runningDistros = @(& wsl.exe --list --running --quiet 2>$null) |
+    ForEach-Object { ($_ -replace "`0", "").Trim() } |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
+  if ($Distro -in $runningDistros) {
+    Add-Content -LiteralPath $LogFile -Value "Execution: wsl.exe --terminate $Distro" -Encoding UTF8
+    & wsl.exe --terminate $Distro
+    if ($LASTEXITCODE -ne 0) {
+      Stop-WithMessage "Impossible d'arreter la distribution $Distro."
+    }
   }
+  else {
+    Add-Content -LiteralPath $LogFile -Value "$Distro était déjà arrêtée; démarrage direct." -Encoding UTF8
+  }
+
   Start-Sleep -Seconds 3
   if (-not (Wait-WslReady)) {
     Stop-WithMessage "$Distro ne redemarre pas apres son arret."
@@ -117,11 +129,53 @@ if (-not $wslCommand) {
   Stop-WithMessage "WSL n'est pas disponible sur ce PC."
 }
 
+if ($Mode -eq "RemoveWsl") {
+  if (-not $ConfirmDestructive) {
+    Stop-WithMessage "La suppression complète exige le paramètre -ConfirmDestructive."
+  }
+
+  $installedDistros = @(& wsl.exe --list --quiet 2>$null) |
+    ForEach-Object { ($_ -replace "`0", "").Trim() } |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+  if ($Distro -notin $installedDistros) {
+    Stop-WithMessage "La distribution $Distro n'est pas installée."
+  }
+
+  Write-Step "Suppression complète de la distribution WSL $Distro"
+  Add-Content -LiteralPath $LogFile -Value "Exécution: wsl.exe --unregister $Distro" -Encoding UTF8
+  & wsl.exe --unregister $Distro
+  if ($LASTEXITCODE -ne 0) {
+    Stop-WithMessage "La suppression de la distribution $Distro a échoué."
+  }
+
+  Write-Host ""
+  Write-Host "La distribution $Distro et toutes ses données ont été supprimées." -ForegroundColor Green
+  Write-Host "Relance l'installation complète pour repartir de zéro." -ForegroundColor Green
+  Write-Host "Journal: $LogFile"
+  exit 0
+}
+
+if ($Mode -eq "RestartWsl") {
+  $installedDistros = @(& wsl.exe --list --quiet 2>$null) |
+    ForEach-Object { ($_ -replace "`0", "").Trim() } |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+  if ($Distro -notin $installedDistros) {
+    Stop-WithMessage "La distribution $Distro n'est pas installée."
+  }
+
+  Restart-WslDistribution -Reason "redémarrage manuel demandé pour l'installation ORMT"
+  Write-Host ""
+  Write-Host "La distribution $Distro a redémarré et répond correctement." -ForegroundColor Green
+  Write-Host "Tu peux maintenant reprendre l'installation ORMT." -ForegroundColor Green
+  Write-Host "Journal: $LogFile"
+  exit 0
+}
+
 $hasDistro = Test-WslReady
 
 if (-not $hasDistro) {
-  if ($Mode -eq "Diagnostic") {
-    Stop-WithMessage "$Distro n'est pas installee; aucun diagnostic n'est possible."
+  if ($Mode -in @("Diagnostic", "ResetStage")) {
+    Stop-WithMessage "$Distro n'est pas installée; le mode $Mode n'est pas possible."
   }
   Write-Step "Installation de $Distro"
   & wsl.exe --install -d $Distro
@@ -141,6 +195,26 @@ if (-not (Wait-WslReady)) {
   if (-not (Wait-WslReady)) {
     Stop-WithMessage "$Distro n'a pas pu etre initialisee."
   }
+}
+
+if ($Mode -eq "ResetStage") {
+  if (-not $ConfirmDestructive) {
+    Stop-WithMessage "La réinitialisation du Stage exige le paramètre -ConfirmDestructive."
+  }
+
+  Write-Step "Réinitialisation des conteneurs, volumes et données du Stage métier"
+  & wsl.exe -d $Distro --cd $PackageRoot -- `
+    bash ./installer/wsl/commands/reset-stage.sh --yes
+  if ($LASTEXITCODE -ne 0) {
+    Stop-WithMessage "La réinitialisation du Stage métier a échoué."
+  }
+
+  Add-Content -LiteralPath $LogFile -Value "Réinitialisation Stage terminée avec succès." -Encoding UTF8
+  Write-Host ""
+  Write-Host "Le Stage métier a été supprimé. Ubuntu WSL et l'infrastructure sont conservés." -ForegroundColor Green
+  Write-Host "Tu peux maintenant relancer l'installation du Stage métier." -ForegroundColor Green
+  Write-Host "Journal: $LogFile"
+  exit 0
 }
 
 $WslLogFile = Convert-ToWslPath -WindowsPath $LogFile
@@ -182,6 +256,20 @@ while ($true) {
 
 if ($installerExitCode -ne 0) {
   Stop-WithMessage "L'installation WSL a echoue avec le code $installerExitCode."
+}
+
+if ($Mode -in @("Full", "Infrastructure", "Stage", "Repair")) {
+  Restart-WslDistribution -Reason "test final de demarrage a froid"
+
+  $validationScope = if ($Mode -eq "Infrastructure") { "infrastructure" } else { "stage" }
+  Write-Step "Validation des services apres redemarrage WSL"
+  & wsl.exe -d $Distro --cd $PackageRoot -- `
+    bash ./installer/wsl/tests/test-after-restart.sh `
+      --scope $validationScope `
+      --log-file $WslLogFile
+  if ($LASTEXITCODE -ne 0) {
+    Stop-WithMessage "Les services ORMT ne fonctionnent pas correctement apres le redemarrage WSL."
+  }
 }
 
 $finalLines = @(

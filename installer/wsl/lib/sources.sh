@@ -6,10 +6,16 @@ validate_source_tree() {
   local required=(
     "ormt-infra-stage-local-vps/ansible/all.playbook.yml"
     "ormt-api/ormt-core-api/pom.xml"
+    "ormt-api/ormt-core-api/mvnw"
     "ormt-api/ormt-content-api/pom.xml"
+    "ormt-api/ormt-content-api/mvnw"
+    "ormt-api/docker/app/env/.env.stage"
+    "ormt-api/docker/app/docker-compose.ormt-core-api.base.yml"
+    "ormt-api/docker/app/docker-compose.ormt-content-api.base.yml"
     "ormt-web-v1/package.json"
     "ormt-web-v1/angular.json"
     "ormt-web-v1/Dockerfile"
+    "ormt-web-v1/src/environments/environment.stage.ts"
   )
   local relative
 
@@ -95,6 +101,19 @@ activate_source_paths() {
     printf 'ORMT_API_DIR=%q\n' "$ORMT_API_DIR"
     printf 'ORMT_WEB_DIR=%q\n' "$ORMT_WEB_DIR"
   } > "$STATE_SOURCE_ENV"
+}
+
+normalize_build_wrappers() {
+  local wrapper
+  local wrappers=(
+    "$ORMT_API_DIR/ormt-core-api/mvnw"
+    "$ORMT_API_DIR/ormt-content-api/mvnw"
+  )
+
+  for wrapper in "${wrappers[@]}"; do
+    test -f "$wrapper" || die "Wrapper Maven introuvable: $wrapper"
+    sed -i 's/\r$//' "$wrapper"
+  done
 }
 
 sync_provided_sources() {
@@ -198,7 +217,10 @@ prepare_sources() {
   log "Provenance des projets sélectionnée: $selected"
 
   case "$selected" in
-    provided) sync_provided_sources "$provided_root" ;;
+    provided)
+      sync_provided_sources "$provided_root"
+      normalize_build_wrappers
+      ;;
     git) sync_git_sources ;;
   esac
 }
