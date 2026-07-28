@@ -74,11 +74,22 @@ function Wait-WslReady {
 
 function Convert-ToWslPath {
   param([string]$WindowsPath)
-  $converted = & wsl.exe -d $Distro -- wslpath -a -u $WindowsPath 2>$null
-  if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($converted | Out-String))) {
-    Stop-WithMessage "Impossible de convertir le chemin Windows pour WSL: $WindowsPath"
+
+  $fullPath = [System.IO.Path]::GetFullPath($WindowsPath)
+  $windowsRoot = [System.IO.Path]::GetPathRoot($fullPath)
+
+  if ($windowsRoot -notmatch "^(?<drive>[A-Za-z]):\\$") {
+    Stop-WithMessage "Chemin Windows non pris en charge par WSL: $fullPath. Place le dossier ORMT sur un disque local (C:, D:, etc.)."
   }
-  return (($converted | Select-Object -First 1).Trim())
+
+  $drive = $Matches["drive"].ToLowerInvariant()
+  $relativePath = $fullPath.Substring($windowsRoot.Length).Replace("\", "/")
+
+  if ([string]::IsNullOrWhiteSpace($relativePath)) {
+    return "/mnt/$drive"
+  }
+
+  return "/mnt/$drive/$relativePath"
 }
 
 function Invoke-WslInstaller {
