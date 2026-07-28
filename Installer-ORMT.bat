@@ -131,7 +131,7 @@ echo  2. Supprimer completement Ubuntu-24.04
 echo     Efface definitivement toute la distribution WSL.
 echo.
 echo  3. Redemarrer uniquement Ubuntu-24.04
-echo     Arrete puis relance la distribution utilisee par ORMT.
+echo     Arrete, relance et valide les services ORMT installes.
 echo.
 echo  0. Retour
 echo.

@@ -283,14 +283,30 @@ ensure_infrastructure() {
 }
 
 install_stage() {
-  "$SCRIPT_DIR/tests/test-infrastructure.sh" ||
-    die "L'infrastructure doit être validée avant le Stage métier."
   run_with_heartbeat "Installation du Stage métier" \
     "$SCRIPT_DIR/phases/install-stage.sh"
 }
 
+validate_stage_prerequisites() {
+  CURRENT_STEP="Validation du socle minimal requis par le Stage"
+  "$SCRIPT_DIR/tests/test-stage-prerequisites.sh"
+  CURRENT_STEP=""
+}
+
 reset_stage_before_install() {
   test "$RESET_STAGE" = true || return 0
+  printf '\n============================================================\n'
+  printf 'ATTENTION — RÉINSTALLATION COMPLÈTE DU STAGE MÉTIER\n'
+  printf 'Tous les conteneurs, volumes et données métier seront supprimés.\n'
+  printf 'L’infrastructure partagée et Ubuntu WSL seront conservés.\n'
+  printf '============================================================\n\n'
+  if ! read -r -p "Tape exactement REINSTALLER pour continuer: " confirmation; then
+    die "Confirmation interactive indisponible. Aucune donnée n'a été supprimée."
+  fi
+  if test "$confirmation" != "REINSTALLER"; then
+    printf '\nRéinstallation du Stage annulée. Aucune donnée n’a été supprimée.\n'
+    exit 44
+  fi
   CURRENT_STEP="Suppression complète du Stage métier existant"
   "$SCRIPT_DIR/commands/reset-stage.sh" --yes
   CURRENT_STEP=""
@@ -340,6 +356,7 @@ case "$MODE" in
   stage)
     prepare_environment
     sync_sources
+    validate_stage_prerequisites
     reset_stage_before_install
     install_stage
     ;;

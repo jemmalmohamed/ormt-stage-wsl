@@ -134,10 +134,17 @@ sync_git_project() {
   local url="$2"
   local branch="$3"
   local name="$4"
+  local incomplete_backup=""
+  local incomplete_root=""
 
-  if test -d "$dir/.git" && ! git -C "$dir" rev-parse --verify HEAD >/dev/null 2>&1; then
-    log "Nettoyage du clone incomplet de $name"
-    rm -rf "$dir"
+  if test -d "$dir/.git" &&
+    { ! git -C "$dir" rev-parse --verify HEAD >/dev/null 2>&1 ||
+      ! test -f "$dir/.git/index"; }; then
+    incomplete_root="$(dirname "$dir")/.incomplete"
+    mkdir -p "$incomplete_root"
+    incomplete_backup="${incomplete_root}/$(basename "$dir")-$(date '+%Y%m%d-%H%M%S')-$$"
+    log "Clone incomplet de $name détecté: conservation dans $incomplete_backup"
+    mv "$dir" "$incomplete_backup"
   fi
 
   if test -d "$dir/.git"; then
@@ -189,6 +196,8 @@ sync_git_project() {
     git clone --progress --depth 20 "$url" "$dir"
   fi
 
+  test -f "$dir/.git/index" ||
+    die "Le clone de $name est incomplet (index Git absent): $dir"
   printf '  %s: %s\n' "$name" "$(git -C "$dir" rev-parse --short HEAD)"
 }
 
@@ -198,12 +207,18 @@ sync_git_sources() {
     sudo apt-get update
     sudo apt-get install -y git ca-certificates
   fi
+
   activate_source_paths git
   mkdir -p "$ORMT_WSL_WORKSPACE"
-  sync_git_project "$ORMT_INFRA_DIR" "$ORMT_INFRA_REPO_URL" "$ORMT_INFRA_BRANCH" "Infrastructure"
-  sync_git_project "$ORMT_API_DIR" "$ORMT_API_REPO_URL" "$ORMT_API_BRANCH" "API"
-  sync_git_project "$ORMT_WEB_DIR" "$ORMT_WEB_REPO_URL" "$ORMT_WEB_BRANCH" "Frontend"
+  log "Mise à jour rapide des projets dans le système de fichiers WSL"
+  sync_git_project "$ORMT_INFRA_DIR" \
+    "$ORMT_INFRA_REPO_URL" "$ORMT_INFRA_BRANCH" "Infrastructure"
+  sync_git_project "$ORMT_API_DIR" \
+    "$ORMT_API_REPO_URL" "$ORMT_API_BRANCH" "API"
+  sync_git_project "$ORMT_WEB_DIR" \
+    "$ORMT_WEB_REPO_URL" "$ORMT_WEB_BRANCH" "Frontend"
   mark_state source-mode git
+  mark_state source-origin git
 }
 
 resolve_source_mode() {

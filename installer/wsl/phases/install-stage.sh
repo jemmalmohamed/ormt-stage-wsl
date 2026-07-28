@@ -5,8 +5,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/../lib/common.sh"
 
-"$WSL_ROOT/tests/test-infrastructure.sh"
 "$WSL_ROOT/commands/start-stage.sh"
 "$WSL_ROOT/tests/test-stage.sh"
 mark_state stage-validated
-

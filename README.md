@@ -1,7 +1,9 @@
 # Installateur ORMT Stage pour Windows et WSL
 
-Cet installateur prépare une infrastructure complète sous Ubuntu WSL, la
-valide, puis installe et teste le Stage métier ORMT.
+Cet installateur prépare une infrastructure complète sous Ubuntu WSL, la valide,
+puis installe et teste le Stage métier ORMT. Les dossiers présents dans
+`sources/` peuvent être réutilisés sur une autre machine sans nouveau clonage
+Git.
 
 Le profil développeur est activé par défaut. Il comprend Traefik, Portainer,
 Jenkins, Homepage, Grafana, Prometheus, cAdvisor et Node Exporter.
@@ -21,7 +23,8 @@ L'installateur effectue automatiquement :
 3. le redémarrage de WSL lorsque le groupe Docker doit être actualisé ;
 4. la validation de l'infrastructure ;
 5. la construction et le démarrage du Stage métier ;
-6. les tests HTTP finaux.
+6. les tests HTTP finaux ;
+7. la proposition facultative d'un test de redémarrage à froid de WSL.
 
 Aucune relance manuelle n'est requise après l'ajout au groupe Docker.
 
@@ -56,8 +59,9 @@ Les raccourcis disponibles à la racine sont :
 ### Détection automatique
 
 Le mode utilisé par défaut recherche les trois projets dans `sources/`. Si les
-trois dossiers sont valides, ils sont copiés vers WSL. Sinon, les dépôts Git
-sont clonés ou mis à jour.
+trois dossiers sont valides, ils sont synchronisés vers WSL sans accès à Git.
+Sinon, ils sont clonés directement dans le système de fichiers Linux de WSL pour
+éviter les lenteurs importantes de `/mnt/c` et `/mnt/d`.
 
 ### Dossiers fournis
 
@@ -70,18 +74,31 @@ sources/
 └── ormt-web-v1/
 ```
 
-Les dossiers `.git` ne sont pas obligatoires. Les projets Windows ne sont
-jamais compilés directement depuis `/mnt/c` ou `/mnt/d` : une copie est créée
-dans `~/ormt-app/` pour conserver les performances Linux.
+Les dossiers `.git` ne sont pas obligatoires en mode `Provided`. Les projets
+Windows ne sont jamais compilés directement depuis `/mnt/c` ou `/mnt/d` : une
+copie optimisée est créée dans `~/ormt-app/provided/` pour conserver les
+performances Linux. Une empreinte par projet évite toute nouvelle copie lorsque
+les fichiers n'ont pas changé.
 
 Ce mode évite Git, mais nécessite toujours Internet pour Ubuntu, Maven, npm et
 les images Docker.
 
-### Git
+### Git rapide dans WSL
 
-Les URLs et branches se configurent dans `config/.env`. Le mode Git refuse
-d'écraser les modifications locales et utilise uniquement des mises à jour
-`fast-forward`.
+Les URLs et branches se configurent dans `config/.env`. Le mode Git clone ou met
+à jour les trois dépôts dans `~/ormt-app/`, refuse d'écraser les modifications
+locales et utilise uniquement des mises à jour `fast-forward`. Aucun clonage ou
+copie automatique n'est effectué dans le dossier Windows monté sous `/mnt/`.
+
+Si un clonage a été interrompu avant la création de son index Git,
+l'installateur conserve le dossier dans un sous-dossier `.incomplete/` de
+`~/ormt-app/` puis recrée automatiquement un clone propre au lancement suivant.
+
+Pour préparer ensuite un installateur transportable, l'utilisateur peut copier
+manuellement les trois projets depuis WSL vers `ormt-stage-wsl/sources/`, puis
+archiver le dossier complet. Sur une autre machine, le mode `Auto` détectera ces
+dossiers et installera sans `git clone` ni `git fetch`. Internet peut cependant
+rester nécessaire pour Ubuntu, Maven, npm et les images Docker.
 
 ## Configuration
 
@@ -124,6 +141,8 @@ Depuis PowerShell :
 .\installer\windows\setup.ps1 -Mode Stage -SourceMode Git
 .\installer\windows\setup.ps1 -Mode Diagnostic
 .\installer\windows\setup.ps1 -Mode Repair -SourceMode Auto
+.\installer\windows\setup.ps1 -Mode Full -FinalWslRestart Always
+.\installer\windows\setup.ps1 -Mode Diagnostic -FinalWslRestart Never
 .\installer\windows\setup.ps1 -Mode ResetStage -ConfirmDestructive
 .\installer\windows\setup.ps1 -Mode RemoveWsl -ConfirmDestructive
 .\installer\windows\setup.ps1 -Mode RestartWsl
@@ -139,8 +158,9 @@ cd ~/ormt-app/ormt-stage-wsl
 ./installer/wsl/commands/reset-stage.sh
 ```
 
-`reset-stage.sh` est destructif et demande de saisir `RESET`. Il n'est jamais
-appelé automatiquement.
+`reset-stage.sh` est destructif et demande de saisir `RESET` lorsqu'il est lancé
+directement. Le mode `Stage` l'appelle seulement après validation du socle
+minimal et confirmation explicite avec `REINSTALLER`.
 
 ## Réinitialisation et nouveau départ
 
@@ -160,10 +180,11 @@ explicite et n'est jamais déclenchée automatiquement après un échec
 d'installation.
 
 Le même sous-menu permet aussi de **redémarrer uniquement `Ubuntu-24.04`**.
-L'installateur exécute un arrêt ciblé de cette distribution, attend son
-redémarrage et vérifie qu'elle répond avant de continuer. Les données et les
-autres distributions WSL ne sont pas touchées. Pour cibler une autre
-distribution depuis PowerShell, utilise par exemple :
+L'installateur exécute un arrêt ciblé de cette distribution, attend Docker,
+détecte si le Stage est installé puis valide automatiquement l'infrastructure
+ou l'ensemble des services métier. Les données et les autres distributions WSL
+ne sont pas touchées. Pour cibler une autre distribution depuis PowerShell,
+utilise par exemple :
 
 ```powershell
 .\installer\windows\setup.ps1 -Mode RestartWsl -Distro "Ubuntu-24.04"
@@ -188,7 +209,15 @@ distribution depuis PowerShell, utilise par exemple :
 Les journaux sont écrits dans `logs/`. Chaque phase affiche sa durée.
 
 En cas d'interruption, relance le même BAT. Les contrôles réels déterminent les
-phases à reprendre. Les volumes et données Stage sont conservés.
+phases à reprendre. Le mode `Repair` conserve les volumes ; le mode `Stage`
+reste une réinstallation destructive nécessitant la confirmation
+`REINSTALLER`.
+
+Après les modes `Full`, `Infrastructure`, `Stage`, `Repair` et `Diagnostic`, la
+question `Redémarrer WSL et vérifier le démarrage à froid ? [o/N]` est proposée.
+La réponse par défaut est `Non`. Pour les scripts automatisés, utilise
+`-FinalWslRestart Always` ou `-FinalWslRestart Never`; une entrée non interactive
+avec la valeur `Ask` ne redémarre jamais WSL.
 
 Le message final suivant signifie que tous les contrôles demandés sont passés :
 

@@ -25,7 +25,7 @@ while test "$#" -gt 0; do
 done
 
 case "$SCOPE" in
-  infrastructure|stage) ;;
+  auto|infrastructure|stage) ;;
   *) die "Périmètre de validation invalide: $SCOPE" ;;
 esac
 
@@ -47,6 +47,27 @@ for attempt in $(seq 1 30); do
 done
 test "$docker_ready" = "true" || die "Docker ne répond pas après le redémarrage WSL."
 
+if test "$SCOPE" = "auto"; then
+  stage_detected=false
+  if has_state stage-validated; then
+    stage_detected=true
+  else
+    for container in ormt-web-stage ormt-core-api ormt-content-api; do
+      if docker container inspect "$container" >/dev/null 2>&1; then
+        stage_detected=true
+        break
+      fi
+    done
+  fi
+
+  if test "$stage_detected" = "true"; then
+    SCOPE="stage"
+  else
+    SCOPE="infrastructure"
+  fi
+  log "Périmètre détecté après redémarrage: $SCOPE"
+fi
+
 if test "$SCOPE" = "stage"; then
   keycloak_ready=false
   for attempt in $(seq 1 60); do
@@ -64,8 +85,7 @@ if test "$SCOPE" = "stage"; then
   done
   test "$keycloak_ready" = "true" || die "Le realm Keycloak ORMT ne répond pas après redémarrage."
 
-  log "Keycloak prêt — stabilisation des API"
-  docker restart ormt-core-api ormt-content-api >/dev/null 2>&1 || true
+  log "Keycloak prêt — attente de la stabilisation automatique des API"
 fi
 
 report_file="$(mktemp)"
@@ -74,12 +94,15 @@ validated=false
 
 for attempt in $(seq 1 60); do
   : > "$report_file"
-  if "$SCRIPT_DIR/test-infrastructure.sh" > "$report_file" 2>&1; then
-    if test "$SCOPE" = "infrastructure" || \
-      "$SCRIPT_DIR/test-stage.sh" >> "$report_file" 2>&1; then
+  if test "$SCOPE" = "infrastructure"; then
+    if "$SCRIPT_DIR/test-infrastructure.sh" > "$report_file" 2>&1; then
       validated=true
       break
     fi
+  elif "$SCRIPT_DIR/test-stage-prerequisites.sh" > "$report_file" 2>&1 &&
+    "$SCRIPT_DIR/test-stage.sh" >> "$report_file" 2>&1; then
+    validated=true
+    break
   fi
 
   if test "$attempt" -eq 1 || test $((attempt % 5)) -eq 0; then

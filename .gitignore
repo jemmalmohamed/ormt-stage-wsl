@@ -3,4 +3,4 @@ logs/*.log
 sources/ormt-infra-stage-local-vps/
 sources/ormt-api/
 sources/ormt-web-v1/
-
+sources/.incomplete/

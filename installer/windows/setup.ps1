@@ -8,7 +8,10 @@ param(
   [string]$ProvidedSourcesDir = "",
   [string]$Distro = "Ubuntu-24.04",
 
-  [switch]$ConfirmDestructive
+  [switch]$ConfirmDestructive,
+
+  [ValidateSet("Ask", "Always", "Never")]
+  [string]$FinalWslRestart = "Ask"
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,7 +26,7 @@ $LogDir = Join-Path $PackageRoot "logs"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $LogFile = Join-Path $LogDir ("setup-{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
 $StartedAt = Get-Date
-$ReinstallStage = $false
+$ReinstallStage = ($Mode -eq "Stage")
 
 if ([string]::IsNullOrWhiteSpace($ProvidedSourcesDir)) {
   $ProvidedSourcesDir = Join-Path $PackageRoot "sources"
@@ -120,7 +123,7 @@ function Invoke-WslInstaller {
 
 function Restart-WslDistribution {
   param([string]$Reason)
-  Write-Step "Redemarrage automatique de WSL - $Reason"
+  Write-Step "Redemarrage de WSL - $Reason"
   $runningDistros = @(& wsl.exe --list --running --quiet 2>$null) |
     ForEach-Object { ($_ -replace "`0", "").Trim() } |
     Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
@@ -139,6 +142,51 @@ function Restart-WslDistribution {
   Start-Sleep -Seconds 3
   if (-not (Wait-WslReady)) {
     Stop-WithMessage "$Distro ne redemarre pas apres son arret."
+  }
+}
+
+function Invoke-ColdStartValidation {
+  param(
+    [ValidateSet("auto", "infrastructure", "stage")]
+    [string]$Scope,
+    [string]$WslLogFile
+  )
+
+  Write-Step "Validation des services apres redemarrage WSL"
+  & wsl.exe -d $Distro --cd $PackageRoot -- `
+    bash ./installer/wsl/tests/test-after-restart.sh `
+      --scope $Scope `
+      --log-file $WslLogFile
+  if ($LASTEXITCODE -ne 0) {
+    Stop-WithMessage "Les services ORMT ne fonctionnent pas correctement apres le redemarrage WSL."
+  }
+}
+
+function Test-InteractiveInput {
+  try {
+    return [Environment]::UserInteractive -and -not [Console]::IsInputRedirected
+  }
+  catch {
+    return $false
+  }
+}
+
+function Test-FinalWslRestartRequested {
+  switch ($FinalWslRestart) {
+    "Always" { return $true }
+    "Never" { return $false }
+    "Ask" {
+      if (-not (Test-InteractiveInput)) {
+        $message = "Entrée non interactive détectée: redémarrage final WSL ignoré."
+        Write-Host $message -ForegroundColor Yellow
+        Add-Content -LiteralPath $LogFile -Value $message -Encoding UTF8
+        return $false
+      }
+
+      Write-Host ""
+      $answer = Read-Host "Redémarrer WSL et vérifier le démarrage à froid ? [o/N]"
+      return ($answer -match "^(?i:o|oui|y|yes)$")
+    }
   }
 }
 
@@ -182,9 +230,10 @@ if ($Mode -eq "RestartWsl") {
   }
 
   Restart-WslDistribution -Reason "redémarrage manuel demandé pour l'installation ORMT"
+  $restartWslLogFile = Convert-ToWslPath -WindowsPath $LogFile
+  Invoke-ColdStartValidation -Scope "auto" -WslLogFile $restartWslLogFile
   Write-Host ""
-  Write-Host "La distribution $Distro a redémarré et répond correctement." -ForegroundColor Green
-  Write-Host "Tu peux maintenant reprendre l'installation ORMT." -ForegroundColor Green
+  Write-Host "La distribution $Distro a redémarré et les services installés sont validés." -ForegroundColor Green
   Write-Host "Journal: $LogFile"
   exit 0
 }
@@ -213,26 +262,6 @@ if (-not (Wait-WslReady)) {
   if (-not (Wait-WslReady)) {
     Stop-WithMessage "$Distro n'a pas pu etre initialisee."
   }
-}
-
-if ($Mode -eq "Stage") {
-  Write-Host ""
-  Write-Host "============================================================" -ForegroundColor Red
-  Write-Host "ATTENTION - RÉINSTALLATION COMPLÈTE DU STAGE MÉTIER" -ForegroundColor Red
-  Write-Host "============================================================" -ForegroundColor Red
-  Write-Host "Tous les conteneurs et volumes du Stage seront supprimés." -ForegroundColor Yellow
-  Write-Host "Cela effacera notamment les bases et fichiers métier existants." -ForegroundColor Yellow
-  Write-Host "L'infrastructure partagée et Ubuntu WSL seront conservés." -ForegroundColor Yellow
-  Write-Host "Cette opération est irréversible." -ForegroundColor Red
-  Write-Host ""
-  $confirmation = Read-Host "Tape REINSTALLER pour confirmer"
-  if ($confirmation -cne "REINSTALLER") {
-    Add-Content -LiteralPath $LogFile -Value "Réinstallation du Stage annulée par l'utilisateur." -Encoding UTF8
-    Write-Host "Réinstallation annulée. Aucune donnée n'a été supprimée." -ForegroundColor Green
-    Write-Host "Journal: $LogFile"
-    exit 0
-  }
-  $ReinstallStage = $true
 }
 
 if ($Mode -eq "ResetStage") {
@@ -292,22 +321,23 @@ while ($true) {
   }
 }
 
+if ($installerExitCode -eq 44) {
+  Add-Content -LiteralPath $LogFile -Value "Réinstallation du Stage annulée par l'utilisateur." -Encoding UTF8
+  Write-Host ""
+  Write-Host "Réinstallation annulée. Aucune donnée n'a été supprimée." -ForegroundColor Green
+  Write-Host "Journal: $LogFile"
+  exit 0
+}
+
 if ($installerExitCode -ne 0) {
   Stop-WithMessage "L'installation WSL a echoue avec le code $installerExitCode."
 }
 
-if ($Mode -in @("Full", "Infrastructure", "Stage", "Repair")) {
-  Restart-WslDistribution -Reason "test final de demarrage a froid"
-
+if ($Mode -in @("Full", "Infrastructure", "Stage", "Repair", "Diagnostic") -and
+  (Test-FinalWslRestartRequested)) {
+  Restart-WslDistribution -Reason "test final de démarrage à froid demandé"
   $validationScope = if ($Mode -eq "Infrastructure") { "infrastructure" } else { "stage" }
-  Write-Step "Validation des services apres redemarrage WSL"
-  & wsl.exe -d $Distro --cd $PackageRoot -- `
-    bash ./installer/wsl/tests/test-after-restart.sh `
-      --scope $validationScope `
-      --log-file $WslLogFile
-  if ($LASTEXITCODE -ne 0) {
-    Stop-WithMessage "Les services ORMT ne fonctionnent pas correctement apres le redemarrage WSL."
-  }
+  Invoke-ColdStartValidation -Scope $validationScope -WslLogFile $WslLogFile
 }
 
 $finalLines = @(
