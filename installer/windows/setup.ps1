@@ -23,6 +23,7 @@ $LogDir = Join-Path $PackageRoot "logs"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $LogFile = Join-Path $LogDir ("setup-{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
 $StartedAt = Get-Date
+$ReinstallStage = $false
 
 if ([string]::IsNullOrWhiteSpace($ProvidedSourcesDir)) {
   $ProvidedSourcesDir = Join-Path $PackageRoot "sources"
@@ -98,12 +99,18 @@ function Invoke-WslInstaller {
     [string]$WslProvidedSources
   )
 
+  $resetStageArgs = @()
+  if ($ReinstallStage) {
+    $resetStageArgs = @("--reset-stage")
+  }
+
   & wsl.exe -d $Distro --cd $PackageRoot -- `
     bash ./installer/wsl/setup.sh `
       --mode $Mode `
       --source-mode $SourceMode `
       --log-file $WslLogFile `
-      --provided-sources-dir $WslProvidedSources
+      --provided-sources-dir $WslProvidedSources `
+      @resetStageArgs
 
   # Ne pas retourner la sortie standard dans une affectation PowerShell : elle
   # doit rester directement reliee au terminal pour sudo. Seul le code est
@@ -206,6 +213,26 @@ if (-not (Wait-WslReady)) {
   if (-not (Wait-WslReady)) {
     Stop-WithMessage "$Distro n'a pas pu etre initialisee."
   }
+}
+
+if ($Mode -eq "Stage") {
+  Write-Host ""
+  Write-Host "============================================================" -ForegroundColor Red
+  Write-Host "ATTENTION - RÉINSTALLATION COMPLÈTE DU STAGE MÉTIER" -ForegroundColor Red
+  Write-Host "============================================================" -ForegroundColor Red
+  Write-Host "Tous les conteneurs et volumes du Stage seront supprimés." -ForegroundColor Yellow
+  Write-Host "Cela effacera notamment les bases et fichiers métier existants." -ForegroundColor Yellow
+  Write-Host "L'infrastructure partagée et Ubuntu WSL seront conservés." -ForegroundColor Yellow
+  Write-Host "Cette opération est irréversible." -ForegroundColor Red
+  Write-Host ""
+  $confirmation = Read-Host "Tape REINSTALLER pour confirmer"
+  if ($confirmation -cne "REINSTALLER") {
+    Add-Content -LiteralPath $LogFile -Value "Réinstallation du Stage annulée par l'utilisateur." -Encoding UTF8
+    Write-Host "Réinstallation annulée. Aucune donnée n'a été supprimée." -ForegroundColor Green
+    Write-Host "Journal: $LogFile"
+    exit 0
+  }
+  $ReinstallStage = $true
 }
 
 if ($Mode -eq "ResetStage") {

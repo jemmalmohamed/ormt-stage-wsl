@@ -131,6 +131,10 @@ fi
 
 set_progress "Frontend Stage — démarrage du conteneur"
 log "Démarrage du frontend"
+if docker container inspect ormt-web-stage >/dev/null 2>&1; then
+  log "Ancien conteneur frontend détecté: recréation sans suppression de données"
+  docker container rm --force ormt-web-stage >/dev/null
+fi
 compose_up "$ORMT_WEB_DIR" \
   --env-file ./docker/app/env/.env.stage \
   -f ./docker/app/docker-compose.ormt-web.stage.yml \
