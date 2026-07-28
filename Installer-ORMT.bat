@@ -18,16 +18,18 @@ echo  6. Configuration
 echo  7. Reinitialisation / suppression
 echo  0. Quitter
 echo.
-choice /C 12345670 /N /M "Votre choix: "
+set "MENU_CHOICE="
+set /p "MENU_CHOICE=Votre choix puis Entree: "
 
-if errorlevel 8 exit /b 0
-if errorlevel 7 goto MAINTENANCE
-if errorlevel 6 goto CONFIGURATION
-if errorlevel 5 goto MODE_REPAIR
-if errorlevel 4 goto MODE_DIAGNOSTIC
-if errorlevel 3 goto MODE_STAGE
-if errorlevel 2 goto MODE_INFRASTRUCTURE
-if errorlevel 1 goto MODE_FULL
+if "%MENU_CHOICE%"=="0" exit /b 0
+if "%MENU_CHOICE%"=="7" goto MAINTENANCE
+if "%MENU_CHOICE%"=="6" goto CONFIGURATION
+if "%MENU_CHOICE%"=="5" goto MODE_REPAIR
+if "%MENU_CHOICE%"=="4" goto MODE_DIAGNOSTIC
+if "%MENU_CHOICE%"=="3" goto MODE_STAGE
+if "%MENU_CHOICE%"=="2" goto MODE_INFRASTRUCTURE
+if "%MENU_CHOICE%"=="1" goto MODE_FULL
+goto MENU
 
 :MODE_REPAIR
 set "INSTALL_MODE=Repair"
@@ -62,11 +64,13 @@ echo  2. Cloner ou mettre a jour depuis Git
 echo  3. Detection automatique
 echo  0. Retour
 echo.
-choice /C 1230 /N /M "Votre choix: "
-if errorlevel 4 goto MENU
-if errorlevel 3 goto SOURCE_AUTO
-if errorlevel 2 goto SOURCE_GIT
-if errorlevel 1 goto PROVIDED_PATH
+set "SOURCE_CHOICE="
+set /p "SOURCE_CHOICE=Votre choix puis Entree: "
+if "%SOURCE_CHOICE%"=="0" goto MENU
+if "%SOURCE_CHOICE%"=="3" goto SOURCE_AUTO
+if "%SOURCE_CHOICE%"=="2" goto SOURCE_GIT
+if "%SOURCE_CHOICE%"=="1" goto PROVIDED_PATH
+goto SOURCE_MENU
 
 :SOURCE_AUTO
 set "SOURCE_MODE=Auto"
@@ -94,8 +98,9 @@ echo Mode       : %INSTALL_MODE%
 echo Sources    : %SOURCE_MODE%
 if not "%SOURCE_MODE%"=="Git" if defined PROVIDED_DIR echo Dossier     : %PROVIDED_DIR%
 echo.
-choice /C ON /N /M "Continuer ? [O/N]: "
-if errorlevel 2 goto MENU
+set "CONTINUE_CHOICE="
+set /p "CONTINUE_CHOICE=Continuer ? [O/N] puis Entree: "
+if /I not "%CONTINUE_CHOICE%"=="O" goto MENU
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer\windows\setup.ps1" -Mode "%INSTALL_MODE%" -SourceMode "%SOURCE_MODE%" -ProvidedSourcesDir "%PROVIDED_DIR%"
 set "INSTALL_EXIT=%ERRORLEVEL%"
@@ -135,11 +140,13 @@ echo     Arrete, relance et valide les services ORMT installes.
 echo.
 echo  0. Retour
 echo.
-choice /C 1230 /N /M "Votre choix: "
-if errorlevel 4 goto MENU
-if errorlevel 3 goto RESTART_WSL
-if errorlevel 2 goto REMOVE_WSL
-if errorlevel 1 goto RESET_STAGE
+set "MAINTENANCE_CHOICE="
+set /p "MAINTENANCE_CHOICE=Votre choix puis Entree: "
+if "%MAINTENANCE_CHOICE%"=="0" goto MENU
+if "%MAINTENANCE_CHOICE%"=="3" goto RESTART_WSL
+if "%MAINTENANCE_CHOICE%"=="2" goto REMOVE_WSL
+if "%MAINTENANCE_CHOICE%"=="1" goto RESET_STAGE
+goto MAINTENANCE
 
 :RESTART_WSL
 cls
@@ -150,8 +157,9 @@ echo.
 echo La distribution ORMT sera arretee puis relancee.
 echo Les donnees, conteneurs, volumes et sources seront conserves.
 echo.
-choice /C ON /N /M "Continuer ? [O/N]: "
-if errorlevel 2 goto MAINTENANCE
+set "RESTART_CHOICE="
+set /p "RESTART_CHOICE=Continuer ? [O/N] puis Entree: "
+if /I not "%RESTART_CHOICE%"=="O" goto MAINTENANCE
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer\windows\setup.ps1" -Mode RestartWsl
 set "MAINTENANCE_EXIT=%ERRORLEVEL%"
 goto MAINTENANCE_RESULT
