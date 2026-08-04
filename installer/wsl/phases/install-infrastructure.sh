@@ -13,14 +13,18 @@ test -d "$ORMT_INFRA_DIR/ansible" ||
   die "Sources infrastructure invalides: $ORMT_INFRA_DIR"
 
 log "Installation des prérequis système"
+set_progress "Paquets Ubuntu — actualisation des catalogues (apt-get update)"
 sudo apt-get update
+set_progress "Paquets Ubuntu — installation de Git, Ansible, Python, curl et des certificats"
 sudo apt-get install -y git ansible python3-pip curl ca-certificates
 
 log "Installation des collections Ansible"
+set_progress "Ansible Galaxy — installation des collections requises"
 (cd "$ORMT_INFRA_DIR/ansible" &&
   ansible-galaxy collection install -r requirements.yml)
 
 log "Installation du système et de Docker avec Ansible"
+set_progress "Ansible système — préparation du moteur Docker et de l'utilisateur Linux"
 base_ansible_args=(
   -i inventory/hosts
   all.playbook.yml
@@ -28,15 +32,18 @@ base_ansible_args=(
   --skip-tags traefik,homepage,portainer,monitoring,jenkins
 )
 
+clear_progress
 (cd "$ORMT_INFRA_DIR/ansible" &&
   ansible-playbook -v "${base_ansible_args[@]}")
 
+set_progress "Docker — vérification du service puis téléchargement des images d'infrastructure"
 ensure_docker_service
 prefetch_docker_images \
   "$ORMT_INFRA_DIR/ansible/roles/docker-containers/containers" \
   "${ORMT_DOCKER_PULL_PARALLEL:-4}"
 
 log "Configuration et démarrage des conteneurs avec Ansible"
+set_progress "Ansible conteneurs — préparation de Traefik et des outils d'infrastructure"
 container_ansible_args=(
   -i inventory/hosts
   docker-containers.playbook.yml
@@ -48,9 +55,11 @@ if test "$ORMT_INSTALL_DEV_TOOLS" != "true"; then
   container_ansible_args+=(--skip-tags homepage,portainer,monitoring,jenkins)
 fi
 
+clear_progress
 (cd "$ORMT_INFRA_DIR/ansible" &&
   ansible-playbook -v "${container_ansible_args[@]}")
 
+set_progress "Infrastructure — vérification finale de Docker, du groupe utilisateur et du réseau proxy"
 ensure_docker_service
 mark_state infrastructure-installed "$ORMT_INSTALL_DEV_TOOLS"
 
@@ -64,4 +73,5 @@ fi
 
 docker compose version
 docker network inspect proxy >/dev/null
+clear_progress
 log "Infrastructure installée"

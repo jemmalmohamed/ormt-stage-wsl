@@ -180,6 +180,7 @@ show_current_activity() {
   local reported_progress=""
   local process_list=""
   local activity="traitement en cours"
+  local ansible_active=false
 
   if test -n "${LOG_FILE:-}" && test -f "$LOG_FILE"; then
     ansible_task="$(grep -aE '^(PLAY|TASK) \[' "$LOG_FILE" 2>/dev/null \
@@ -194,6 +195,9 @@ show_current_activity() {
   fi
 
   process_list="$(ps -eo comm=,args= 2>/dev/null || true)"
+  if grep -q 'ansible-playbook' <<< "$process_list"; then
+    ansible_active=true
+  fi
   if grep -Eq 'AnsiballZ_get_url|(^|[ /])(curl|wget)([ ]|$)' <<< "$process_list"; then
     activity="téléchargement réseau"
   elif grep -Eq 'AnsiballZ_(apt|apt_repository)|(^|[ /])(apt|apt-get|dpkg)([ ]|$)' <<< "$process_list"; then
@@ -213,8 +217,9 @@ show_current_activity() {
   printf '\n[%s] %s — durée %s\n' "$(date '+%H:%M:%S')" "$label" "$(format_elapsed "$elapsed")"
   if test -n "$reported_progress"; then
     printf '  Sous-étape : %s\n' "$reported_progress"
-  elif test -n "$ansible_task"; then
-    printf '  Sous-étape : %s\n' "$ansible_task"
+  fi
+  if test "$ansible_active" = true && test -n "$ansible_task"; then
+    printf '  Tâche Ansible : %s\n' "$ansible_task"
   fi
   printf '  Activité   : %s\n' "$activity"
   printf '  État       : processus actif, veuillez patienter\n'
@@ -234,7 +239,7 @@ run_with_heartbeat() {
   while kill -0 "$pid" 2>/dev/null; do
     sleep 1
     heartbeat_seconds=$((heartbeat_seconds + 1))
-    if test "$heartbeat_seconds" -ge 30 && kill -0 "$pid" 2>/dev/null; then
+    if test "$heartbeat_seconds" -ge 15 && kill -0 "$pid" 2>/dev/null; then
       show_current_activity "$label" "$started"
       heartbeat_seconds=0
     fi

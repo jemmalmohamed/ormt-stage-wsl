@@ -146,6 +146,11 @@ Lors d'une première installation, les images de l'infrastructure sont
 téléchargées avec une progression visible et jusqu'à quatre téléchargements
 simultanés. Les relances réutilisent les images déjà présentes.
 
+Pendant les opérations longues, un point d'avancement est affiché toutes les
+15 secondes. Il indique la sous-étape contrôlée par l'installateur, l'activité
+détectée et, pendant les playbooks, la dernière tâche Ansible active. Ce suivi
+évite d'afficher des lignes de journal brutes pouvant contenir des identifiants.
+
 Les images PostgreSQL, Keycloak, MinIO et Nextcloud sont également préchargées
 en parallèle. Les deux API sont compilées simultanément avec le cache Maven
 persistant de WSL, puis seules leurs images d'exécution sont assemblées.
