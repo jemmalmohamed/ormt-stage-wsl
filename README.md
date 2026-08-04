@@ -150,10 +150,9 @@ Lors d'une première installation, les images de l'infrastructure sont
 téléchargées avec une progression visible et jusqu'à quatre téléchargements
 simultanés. Les relances réutilisent les images déjà présentes.
 
-Pendant les opérations longues, un point d'avancement est affiché toutes les
-15 secondes. Il indique la sous-étape contrôlée par l'installateur, l'activité
-détectée et, pendant les playbooks, la dernière tâche Ansible active. Ce suivi
-évite d'afficher des lignes de journal brutes pouvant contenir des identifiants.
+Pendant les opérations longues, la sortie native des commandes APT, Ansible,
+Docker, Maven et npm est affichée directement dans le terminal. Aucun bloc
+d'avancement périodique n'est ajouté au flux.
 
 L'actualisation APT utilise les mécanismes Ubuntu standards : trois tentatives
 réseau et aucun téléchargement de traduction de descriptions de paquets. Si

@@ -167,86 +167,15 @@ show_failure() {
 }
 trap 'show_failure "$LINENO" "$BASH_COMMAND"' ERR
 
-format_elapsed() {
-  local total_seconds="$1"
-  printf '%02d:%02d' "$((total_seconds / 60))" "$((total_seconds % 60))"
-}
-
-show_current_activity() {
-  local label="$1"
-  local started="$2"
-  local elapsed=$((SECONDS - started))
-  local ansible_task=""
-  local reported_progress=""
-  local process_list=""
-  local activity="traitement en cours"
-  local ansible_active=false
-
-  if test -n "${LOG_FILE:-}" && test -f "$LOG_FILE"; then
-    ansible_task="$(grep -aE '^(PLAY|TASK) \[' "$LOG_FILE" 2>/dev/null \
-      | tail -n 1 \
-      | sed -E $'s/\033\[[0-9;]*[[:alpha:]]//g' \
-      | sed -E 's/^TASK \[([^]]+)\].*/\1/; s/^PLAY \[([^]]+)\].*/\1/' \
-      || true)"
-  fi
-
-  if test -s "${ORMT_PROGRESS_FILE:-}"; then
-    reported_progress="$(tail -n 1 "$ORMT_PROGRESS_FILE" 2>/dev/null || true)"
-  fi
-
-  process_list="$(ps -eo comm=,args= 2>/dev/null || true)"
-  if grep -q 'ansible-playbook' <<< "$process_list"; then
-    ansible_active=true
-  fi
-  if grep -Eq 'AnsiballZ_get_url|(^|[ /])(curl|wget)([ ]|$)' <<< "$process_list"; then
-    activity="téléchargement réseau"
-  elif grep -Eq 'AnsiballZ_(apt|apt_repository)|(^|[ /])(apt|apt-get|dpkg)([ ]|$)' <<< "$process_list"; then
-    activity="installation des paquets Ubuntu"
-  elif grep -Eq 'docker (build|compose)|buildkit|buildx' <<< "$process_list"; then
-    activity="construction ou démarrage Docker"
-  elif grep -Eq '(^|[ /])(mvn|mvnw)([ ]|$)' <<< "$process_list"; then
-    activity="compilation Maven"
-  elif grep -Eq '(^|[ /])(npm|node|ng)([ ]|$)' <<< "$process_list"; then
-    activity="installation ou compilation frontend"
-  elif grep -Eq '(^|[ /])git (clone|fetch|pull)' <<< "$process_list"; then
-    activity="récupération des sources Git"
-  elif grep -q 'ansible-playbook' <<< "$process_list"; then
-    activity="exécution Ansible"
-  fi
-
-  printf '\n[%s] %s — durée %s\n' "$(date '+%H:%M:%S')" "$label" "$(format_elapsed "$elapsed")"
-  if test -n "$reported_progress"; then
-    printf '  Sous-étape : %s\n' "$reported_progress"
-  fi
-  if test "$ansible_active" = true && test -n "$ansible_task"; then
-    printf '  Tâche Ansible : %s\n' "$ansible_task"
-  fi
-  printf '  Activité   : %s\n' "$activity"
-  printf '  État       : processus actif, veuillez patienter\n'
-}
-
-run_with_heartbeat() {
+run_with_live_output() {
   local label="$1"
   shift
   CURRENT_STEP="$label"
   rm -f "${ORMT_PROGRESS_FILE:-}"
   local started=$SECONDS
-  log "$label"
-  "$@" &
-  local pid=$!
-  local heartbeat_seconds=0
-
-  while kill -0 "$pid" 2>/dev/null; do
-    sleep 1
-    heartbeat_seconds=$((heartbeat_seconds + 1))
-    if test "$heartbeat_seconds" -ge 15 && kill -0 "$pid" 2>/dev/null; then
-      show_current_activity "$label" "$started"
-      heartbeat_seconds=0
-    fi
-  done
-
   local status=0
-  wait "$pid" || status=$?
+  log "$label"
+  "$@" || status=$?
   rm -f "${ORMT_PROGRESS_FILE:-}"
   if test "$status" -eq 0; then
     log "$label terminé en $((SECONDS - started))s"
@@ -296,7 +225,7 @@ ensure_infrastructure() {
 
   clear_state infrastructure-validated
   local status=0
-  if run_with_heartbeat "Installation de l’infrastructure" \
+  if run_with_live_output "Installation de l’infrastructure" \
     "$SCRIPT_DIR/phases/install-infrastructure.sh"; then
     status=0
   else
@@ -313,7 +242,7 @@ ensure_infrastructure() {
 }
 
 install_stage() {
-  run_with_heartbeat "Installation du Stage métier" \
+  run_with_live_output "Installation du Stage métier" \
     "$SCRIPT_DIR/phases/install-stage.sh"
 }
 
