@@ -185,11 +185,18 @@ sync_git_project() {
     local target_ref=""
     if test -n "$branch"; then
       log "Mise à jour de $name sur $branch"
+      local branch_refspec="+refs/heads/$branch:refs/remotes/origin/$branch"
+      if ! git -C "$dir" config --get-all remote.origin.fetch |
+        grep -Fxq "$branch_refspec"; then
+        git -C "$dir" config --add remote.origin.fetch "$branch_refspec"
+      fi
       if test "$(git -C "$dir" rev-parse --is-shallow-repository)" = "true"; then
         log "Approfondissement léger de l'historique Git superficiel"
-        git -C "$dir" fetch --progress --deepen 20 origin "$branch"
+        git -C "$dir" fetch --progress --deepen 20 origin \
+          "$branch_refspec"
       else
-        git -C "$dir" fetch --progress origin "$branch"
+        git -C "$dir" fetch --progress origin \
+          "$branch_refspec"
       fi
       if git -C "$dir" show-ref --verify --quiet "refs/heads/$branch"; then
         git -C "$dir" checkout "$branch"
@@ -232,8 +239,92 @@ sync_git_project() {
   printf '  %s: %s\n' "$name" "$(git -C "$dir" rev-parse --short HEAD)"
 }
 
+select_git_branch() {
+  local url="$1"
+  local configured_branch="$2"
+  local name="$3"
+  local remote_default=""
+  local selected=""
+  local choice=""
+  local index=0
+  local branch=""
+  local configured_available=false
+  local remote_default_available=false
+  local branches=()
+
+  mapfile -t branches < <(
+    git ls-remote --heads "$url" |
+      awk '{sub("refs/heads/", "", $2); print $2}' |
+      sort
+  )
+  test "${#branches[@]}" -gt 0 ||
+    die "Aucune branche distante trouvée pour $name: $url"
+
+  remote_default="$(
+    git ls-remote --symref "$url" HEAD 2>/dev/null |
+      awk '$1 == "ref:" {sub("refs/heads/", "", $2); print $2; exit}'
+  )"
+
+  for branch in "${branches[@]}"; do
+    if test -n "$configured_branch" && test "$branch" = "$configured_branch"; then
+      configured_available=true
+    fi
+    if test -n "$remote_default" && test "$branch" = "$remote_default"; then
+      remote_default_available=true
+    fi
+  done
+
+  if test "$configured_available" = true; then
+    selected="$configured_branch"
+  elif test "$remote_default_available" = true; then
+    selected="$remote_default"
+  else
+    selected="${branches[0]}"
+  fi
+
+  if test "${#branches[@]}" -eq 1; then
+    printf '  %s: une seule branche disponible (%s)\n' "$name" "${branches[0]}" >&2
+    printf '%s\n' "${branches[0]}"
+    return 0
+  fi
+
+  if ! test -t 0; then
+    printf '  %s: entrée non interactive, branche %s sélectionnée\n' "$name" "$selected" >&2
+    printf '%s\n' "$selected"
+    return 0
+  fi
+
+  printf '\nBranches Git disponibles pour %s :\n' "$name" >&2
+  for index in "${!branches[@]}"; do
+    branch="${branches[$index]}"
+    if test "$branch" = "$selected"; then
+      printf '  %d. %s (par défaut)\n' "$((index + 1))" "$branch" >&2
+    else
+      printf '  %d. %s\n' "$((index + 1))" "$branch" >&2
+    fi
+  done
+
+  while true; do
+    printf 'Choisis la branche de %s [défaut: %s] : ' "$name" "$selected" >&2
+    read -r choice
+    if test -z "$choice"; then
+      printf '%s\n' "$selected"
+      return 0
+    fi
+    if [[ "$choice" =~ ^[0-9]+$ ]] &&
+      test "$choice" -ge 1 && test "$choice" -le "${#branches[@]}"; then
+      printf '%s\n' "${branches[$((choice - 1))]}"
+      return 0
+    fi
+    printf 'Choix invalide. Saisis un numéro entre 1 et %d.\n' "${#branches[@]}" >&2
+  done
+}
+
 sync_git_sources() {
   local scope="$1"
+  local infra_branch="$ORMT_INFRA_BRANCH"
+  local api_branch="$ORMT_API_BRANCH"
+  local web_branch="$ORMT_WEB_BRANCH"
   if ! command -v git >/dev/null 2>&1; then
     log "Installation de Git requise pour récupérer les projets"
     sudo apt-get update
@@ -243,15 +334,27 @@ sync_git_sources() {
   activate_source_paths git
   mkdir -p "$ORMT_WSL_WORKSPACE"
   log "Mise à jour rapide des projets dans le système de fichiers WSL"
+  if test "${ORMT_SELECT_GIT_BRANCHES:-false}" = "true"; then
+    if test "$scope" = "infrastructure" || test "$scope" = "all"; then
+      infra_branch="$(select_git_branch \
+        "$ORMT_INFRA_REPO_URL" "$infra_branch" "Infrastructure")"
+    fi
+    if test "$scope" = "stage" || test "$scope" = "all"; then
+      api_branch="$(select_git_branch \
+        "$ORMT_API_REPO_URL" "$api_branch" "API")"
+      web_branch="$(select_git_branch \
+        "$ORMT_WEB_REPO_URL" "$web_branch" "Frontend")"
+    fi
+  fi
   if test "$scope" = "infrastructure" || test "$scope" = "all"; then
     sync_git_project "$ORMT_INFRA_DIR" \
-      "$ORMT_INFRA_REPO_URL" "$ORMT_INFRA_BRANCH" "Infrastructure"
+      "$ORMT_INFRA_REPO_URL" "$infra_branch" "Infrastructure"
   fi
   if test "$scope" = "stage" || test "$scope" = "all"; then
     sync_git_project "$ORMT_API_DIR" \
-      "$ORMT_API_REPO_URL" "$ORMT_API_BRANCH" "API"
+      "$ORMT_API_REPO_URL" "$api_branch" "API"
     sync_git_project "$ORMT_WEB_DIR" \
-      "$ORMT_WEB_REPO_URL" "$ORMT_WEB_BRANCH" "Frontend"
+      "$ORMT_WEB_REPO_URL" "$web_branch" "Frontend"
   fi
   mark_state source-mode git
   mark_state source-origin git

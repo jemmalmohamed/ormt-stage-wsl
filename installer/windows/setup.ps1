@@ -8,6 +8,8 @@ param(
   [string]$ProvidedSourcesDir = "",
   [string]$Distro = "Ubuntu-24.04",
 
+  [switch]$SelectGitBranches,
+
   [switch]$ConfirmDestructive,
 
   [ValidateSet("Ask", "Always", "Never")]
@@ -116,12 +118,18 @@ function Invoke-WslInstaller {
     $resetStageArgs = @("--reset-stage")
   }
 
+  $branchSelectionArgs = @()
+  if ($SelectGitBranches) {
+    $branchSelectionArgs = @("--select-git-branches")
+  }
+
   & wsl.exe -d $Distro --cd $PackageRoot -- `
     bash ./installer/wsl/setup.sh `
       --mode $Mode `
       --source-mode $SourceMode `
       --log-file $WslLogFile `
       --provided-sources-dir $WslProvidedSources `
+      @branchSelectionArgs `
       @resetStageArgs
 
   # Ne pas retourner la sortie standard dans une affectation PowerShell : elle
@@ -302,6 +310,9 @@ $WslProvidedSources = Convert-ToWslPath -WindowsPath $ProvidedSourcesDir
 
 Write-Step "Installation ORMT - mode $Mode - sources $SourceMode"
 Write-Host "Journal: $LogFile"
+if ($SelectGitBranches) {
+  Write-Host "Branches Git: sélection interactive si plusieurs branches sont disponibles"
+}
 if ($SourceMode -ne "Git") {
   Write-Host "Dossiers fournis: $ProvidedSourcesDir"
 }

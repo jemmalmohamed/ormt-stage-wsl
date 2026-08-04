@@ -38,6 +38,7 @@ goto SOURCE_MENU
 :MODE_DIAGNOSTIC
 set "INSTALL_MODE=Diagnostic"
 set "SOURCE_MODE=Auto"
+set "SELECT_GIT_BRANCHES=false"
 set "PROVIDED_DIR=%~dp0sources"
 goto RUN
 
@@ -75,11 +76,19 @@ goto SOURCE_MENU
 :SOURCE_AUTO
 set "SOURCE_MODE=Auto"
 set "PROVIDED_DIR=%~dp0sources"
-goto RUN
+goto BRANCH_SELECTION
 
 :SOURCE_GIT
 set "SOURCE_MODE=Git"
 set "PROVIDED_DIR=%~dp0sources"
+goto BRANCH_SELECTION
+
+:BRANCH_SELECTION
+echo.
+set "SELECT_GIT_BRANCHES=false"
+set "BRANCH_CHOICE="
+set /p "BRANCH_CHOICE=Choisir les branches Git disponibles ? [o/N]: "
+if /I "%BRANCH_CHOICE%"=="O" set "SELECT_GIT_BRANCHES=true"
 goto RUN
 
 :PROVIDED_PATH
@@ -91,18 +100,22 @@ echo   %PROVIDED_DIR%
 set /p "CUSTOM_DIR=Appuie sur Entree ou saisis un autre dossier: "
 if defined CUSTOM_DIR set "PROVIDED_DIR=%CUSTOM_DIR%"
 set "SOURCE_MODE=Provided"
+set "SELECT_GIT_BRANCHES=false"
 
 :RUN
 cls
 echo Mode       : %INSTALL_MODE%
 echo Sources    : %SOURCE_MODE%
+if "%SELECT_GIT_BRANCHES%"=="true" echo Branches   : selection interactive
 if not "%SOURCE_MODE%"=="Git" if defined PROVIDED_DIR echo Dossier     : %PROVIDED_DIR%
 echo.
 set "CONTINUE_CHOICE="
 set /p "CONTINUE_CHOICE=Continuer ? [O/N] puis Entree: "
 if /I not "%CONTINUE_CHOICE%"=="O" goto MENU
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer\windows\setup.ps1" -Mode "%INSTALL_MODE%" -SourceMode "%SOURCE_MODE%" -ProvidedSourcesDir "%PROVIDED_DIR%"
+set "BRANCH_SELECTION_ARG="
+if "%SELECT_GIT_BRANCHES%"=="true" set "BRANCH_SELECTION_ARG=-SelectGitBranches"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer\windows\setup.ps1" -Mode "%INSTALL_MODE%" -SourceMode "%SOURCE_MODE%" -ProvidedSourcesDir "%PROVIDED_DIR%" %BRANCH_SELECTION_ARG%
 set "INSTALL_EXIT=%ERRORLEVEL%"
 echo.
 if "%INSTALL_EXIT%"=="0" (

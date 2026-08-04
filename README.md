@@ -111,6 +111,12 @@ modifications locales et utilise uniquement des mises à jour `fast-forward`.
 Aucun clonage ou copie automatique n'est effectué dans le dossier Windows monté
 sous `/mnt/`.
 
+Après avoir choisi une provenance `Git` ou `Auto` dans le menu, l'installateur
+propose d'afficher les branches distantes. Si cette option est activée, chaque
+dépôt requis ayant plusieurs branches présente une liste numérotée. La branche
+configurée dans `config/.env`, ou à défaut la branche principale distante, est
+présélectionnée. Un dépôt avec une seule branche est sélectionné automatiquement.
+
 Si un clonage a été interrompu avant la création de son index Git,
 l'installateur conserve le dossier dans un sous-dossier `.incomplete/` de
 `~/ormt-app/` puis recrée automatiquement un clone propre au lancement suivant.
@@ -130,6 +136,7 @@ Valeurs principales :
 
 ```text
 ORMT_SOURCE_MODE=auto
+ORMT_SELECT_GIT_BRANCHES=false
 ORMT_INSTALL_DEV_TOOLS=true
 ORMT_SKIP_TESTS=false
 ORMT_DOCKER_PULL_PARALLEL=4
@@ -160,6 +167,7 @@ Depuis PowerShell :
 .\installer\windows\setup.ps1 -Mode Full -SourceMode Auto
 .\installer\windows\setup.ps1 -Mode Infrastructure -SourceMode Provided
 .\installer\windows\setup.ps1 -Mode Stage -SourceMode Git
+.\installer\windows\setup.ps1 -Mode Stage -SourceMode Git -SelectGitBranches
 .\installer\windows\setup.ps1 -Mode Diagnostic
 .\installer\windows\setup.ps1 -Mode Repair -SourceMode Auto
 .\installer\windows\setup.ps1 -Mode Full -FinalWslRestart Always

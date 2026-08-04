@@ -7,6 +7,7 @@ LOG_FILE=""
 PACKAGE_ROOT=""
 PROVIDED_ROOT=""
 RESET_STAGE=false
+SELECT_GIT_BRANCHES=false
 
 while test "$#" -gt 0; do
   case "$1" in
@@ -32,6 +33,10 @@ while test "$#" -gt 0; do
       ;;
     --reset-stage)
       RESET_STAGE=true
+      shift
+      ;;
+    --select-git-branches)
+      SELECT_GIT_BRANCHES=true
       shift
       ;;
     *)
@@ -89,12 +94,17 @@ if [[ "$CURRENT_ROOT" == /mnt/* ]]; then
   if test "$RESET_STAGE" = true; then
     reset_stage_args=(--reset-stage)
   fi
+  branch_selection_args=()
+  if test "$SELECT_GIT_BRANCHES" = true; then
+    branch_selection_args=(--select-git-branches)
+  fi
   exec "$TARGET_ROOT/installer/wsl/setup.sh" \
     --mode "$MODE" \
     --source-mode "$SOURCE_MODE" \
     --log-file "$LOG_FILE" \
     --package-root "$PACKAGE_ROOT" \
     --provided-sources-dir "$PROVIDED_ROOT" \
+    "${branch_selection_args[@]}" \
     "${reset_stage_args[@]}"
 fi
 
@@ -135,6 +145,11 @@ source "$SCRIPT_DIR/lib/common.sh"
 source "$SCRIPT_DIR/lib/sources.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/docker.sh"
+
+if test "$SELECT_GIT_BRANCHES" = true; then
+  ORMT_SELECT_GIT_BRANCHES=true
+fi
+export ORMT_SELECT_GIT_BRANCHES
 
 show_failure() {
   local status=$?
