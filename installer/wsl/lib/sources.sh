@@ -250,18 +250,37 @@ select_git_branch() {
   local branch=""
   local configured_available=false
   local remote_default_available=false
+  local remote_query_ok=false
+  local remote_heads=""
+  local attempt=0
   local branches=()
 
+  for attempt in 1 2 3; do
+    if remote_heads="$(git ls-remote --heads "$url" 2>&1)"; then
+      remote_query_ok=true
+      break
+    fi
+    if test "$attempt" -lt 3; then
+      printf '  %s: accès GitHub impossible, nouvelle tentative %d/3 dans %ds\n' \
+        "$name" "$((attempt + 1))" "$((attempt * 3))" >&2
+      sleep "$((attempt * 3))"
+    fi
+  done
+
+  if test "$remote_query_ok" != true; then
+    printf '%s\n' "$remote_heads" >&2
+    die "Impossible de consulter les branches de $name. Vérifie la connexion Internet et la résolution de github.com."
+  fi
+
   mapfile -t branches < <(
-    git ls-remote --heads "$url" |
-      awk '{sub("refs/heads/", "", $2); print $2}' |
+    awk '{sub("refs/heads/", "", $2); print $2}' <<< "$remote_heads" |
       sort
   )
   test "${#branches[@]}" -gt 0 ||
     die "Aucune branche distante trouvée pour $name: $url"
 
   remote_default="$(
-    git ls-remote --symref "$url" HEAD 2>/dev/null |
+    { git ls-remote --symref "$url" HEAD 2>/dev/null || true; } |
       awk '$1 == "ref:" {sub("refs/heads/", "", $2); print $2; exit}'
   )"
 

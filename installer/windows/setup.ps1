@@ -1,4 +1,4 @@
-param(
+﻿param(
   [ValidateSet("Full", "Infrastructure", "Stage", "Diagnostic", "Repair", "ResetStage", "RemoveWsl", "RestartWsl")]
   [string]$Mode = "Full",
 
