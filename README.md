@@ -19,14 +19,26 @@ Double-clique sur :
 L'installateur effectue automatiquement :
 
 1. la préparation d'Ubuntu WSL et de `systemd` ;
-2. l'installation de l'infrastructure complète ;
-3. le redémarrage de WSL lorsque le groupe Docker doit être actualisé ;
-4. la validation de l'infrastructure ;
-5. la construction et le démarrage du Stage métier ;
-6. les tests HTTP finaux ;
-7. la proposition facultative d'un test de redémarrage à froid de WSL.
+2. la sélection d'`Ubuntu-24.04` comme distribution WSL par défaut ;
+3. l'installation de l'infrastructure complète ;
+4. le redémarrage de WSL lorsque le groupe Docker doit être actualisé ;
+5. la validation de l'infrastructure ;
+6. la construction et le démarrage du Stage métier ;
+7. les tests HTTP finaux ;
+8. la proposition facultative d'un test de redémarrage à froid de WSL.
 
 Aucune relance manuelle n'est requise après l'ajout au groupe Docker.
+
+Lors des modes `Full` et `Infrastructure`, l'installateur exécute également :
+
+```powershell
+wsl --set-default Ubuntu-24.04
+```
+
+Cette commande garantit que les commandes WSL lancées sans option `-d`
+utilisent bien `Ubuntu-24.04`, même lorsqu'une autre distribution est déjà
+installée sur la machine. Elle ne supprime ni ne modifie les autres
+distributions WSL.
 
 ## Menu guidé
 
@@ -203,6 +215,23 @@ utilise par exemple :
 - Homepage : http://lab.localhost
 - Grafana : http://grafana.localhost
 - Prometheus : http://prometheus.localhost
+
+## Identifiants de test
+
+Les mots de passe du Stage local suivent le modèle `nomService@ormt` :
+
+- PostgreSQL : utilisateur `ormt`, mot de passe `postgres@ormt`
+- Keycloak : utilisateur `admin`, mot de passe `keycloak@ormt`
+- MinIO : utilisateur `minio`, mot de passe `minio@ormt`
+- Nextcloud : utilisateur `admin`, mot de passe `nextcloud@ormt`
+- Portainer : utilisateur `admin`, mot de passe `portainer@ormt`
+- Jenkins : utilisateur `admin`, mot de passe `jenkins@ormt`
+- Grafana : utilisateur `admin`, mot de passe `grafana@ormt`
+
+Ces valeurs sont réservées aux tests locaux. Après une installation déjà
+initialisée, les volumes Docker conservent les anciens mots de passe. Le mode
+`Stage` recrée les volumes métier ; pour Jenkins, Portainer et Grafana, il faut
+également recréer leurs volumes, ce qui supprime leurs données locales.
 
 ## Journaux et reprise
 

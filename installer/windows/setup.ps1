@@ -76,6 +76,15 @@ function Wait-WslReady {
   return $false
 }
 
+function Set-DefaultWslDistribution {
+  Write-Step "Sélection de $Distro comme distribution WSL par défaut"
+  Add-Content -LiteralPath $LogFile -Value "Exécution: wsl.exe --set-default $Distro" -Encoding UTF8
+  & wsl.exe --set-default $Distro
+  if ($LASTEXITCODE -ne 0) {
+    Stop-WithMessage "Impossible de définir $Distro comme distribution WSL par défaut."
+  }
+}
+
 function Convert-ToWslPath {
   param([string]$WindowsPath)
 
@@ -262,6 +271,10 @@ if (-not (Wait-WslReady)) {
   if (-not (Wait-WslReady)) {
     Stop-WithMessage "$Distro n'a pas pu etre initialisee."
   }
+}
+
+if ($Mode -in @("Full", "Infrastructure")) {
+  Set-DefaultWslDistribution
 }
 
 if ($Mode -eq "ResetStage") {
