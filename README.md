@@ -70,10 +70,17 @@ Les raccourcis disponibles à la racine sont :
 
 ### Détection automatique
 
-Le mode utilisé par défaut recherche les trois projets dans `sources/`. Si les
-trois dossiers sont valides, ils sont synchronisés vers WSL sans accès à Git.
-Sinon, ils sont clonés directement dans le système de fichiers Linux de WSL pour
-éviter les lenteurs importantes de `/mnt/c` et `/mnt/d`.
+Le mode utilisé par défaut recherche dans `sources/` uniquement les projets
+nécessaires à l'opération demandée. Si les dossiers requis sont valides, ils
+sont synchronisés vers WSL sans accès à Git. Sinon, les dépôts nécessaires sont
+clonés directement dans le système de fichiers Linux de WSL pour éviter les
+lenteurs importantes de `/mnt/c` et `/mnt/d`.
+
+Le périmètre dépend du mode d'installation :
+
+- `Infrastructure` synchronise uniquement `ormt-infra-stage-local-vps` ;
+- `Stage` synchronise uniquement `ormt-api` et `ormt-web-v1` ;
+- `Full` et `Repair` synchronisent les trois projets.
 
 ### Dossiers fournis
 
@@ -86,7 +93,8 @@ sources/
 └── ormt-web-v1/
 ```
 
-Les dossiers `.git` ne sont pas obligatoires en mode `Provided`. Les projets
+Les dossiers `.git` ne sont pas obligatoires en mode `Provided`. Seuls les
+projets nécessaires au mode demandé doivent être présents. Les projets
 Windows ne sont jamais compilés directement depuis `/mnt/c` ou `/mnt/d` : une
 copie optimisée est créée dans `~/ormt-app/provided/` pour conserver les
 performances Linux. Une empreinte par projet évite toute nouvelle copie lorsque
@@ -98,9 +106,10 @@ les images Docker.
 ### Git rapide dans WSL
 
 Les URLs et branches se configurent dans `config/.env`. Le mode Git clone ou met
-à jour les trois dépôts dans `~/ormt-app/`, refuse d'écraser les modifications
-locales et utilise uniquement des mises à jour `fast-forward`. Aucun clonage ou
-copie automatique n'est effectué dans le dossier Windows monté sous `/mnt/`.
+à jour uniquement les dépôts requis dans `~/ormt-app/`, refuse d'écraser les
+modifications locales et utilise uniquement des mises à jour `fast-forward`.
+Aucun clonage ou copie automatique n'est effectué dans le dossier Windows monté
+sous `/mnt/`.
 
 Si un clonage a été interrompu avant la création de son index Git,
 l'installateur conserve le dossier dans un sous-dossier `.incomplete/` de

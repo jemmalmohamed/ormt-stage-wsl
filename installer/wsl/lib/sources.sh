@@ -2,22 +2,48 @@
 
 validate_source_tree() {
   local root="$1"
+  local scope="${2:-all}"
   local failures=0
-  local required=(
-    "ormt-infra-stage-local-vps/ansible/all.playbook.yml"
-    "ormt-api/ormt-core-api/pom.xml"
-    "ormt-api/ormt-core-api/mvnw"
-    "ormt-api/ormt-content-api/pom.xml"
-    "ormt-api/ormt-content-api/mvnw"
-    "ormt-api/docker/app/env/.env.stage"
-    "ormt-api/docker/app/docker-compose.ormt-core-api.base.yml"
-    "ormt-api/docker/app/docker-compose.ormt-content-api.base.yml"
-    "ormt-web-v1/package.json"
-    "ormt-web-v1/angular.json"
-    "ormt-web-v1/Dockerfile"
-    "ormt-web-v1/src/environments/environment.stage.ts"
-  )
+  local required=()
   local relative
+
+  case "$scope" in
+    infrastructure)
+      required+=("ormt-infra-stage-local-vps/ansible/all.playbook.yml")
+      ;;
+    stage)
+      required+=(
+        "ormt-api/ormt-core-api/pom.xml"
+        "ormt-api/ormt-core-api/mvnw"
+        "ormt-api/ormt-content-api/pom.xml"
+        "ormt-api/ormt-content-api/mvnw"
+        "ormt-api/docker/app/env/.env.stage"
+        "ormt-api/docker/app/docker-compose.ormt-core-api.base.yml"
+        "ormt-api/docker/app/docker-compose.ormt-content-api.base.yml"
+        "ormt-web-v1/package.json"
+        "ormt-web-v1/angular.json"
+        "ormt-web-v1/Dockerfile"
+        "ormt-web-v1/src/environments/environment.stage.ts"
+      )
+      ;;
+    all)
+      required+=(
+        "ormt-infra-stage-local-vps/ansible/all.playbook.yml"
+        "ormt-api/ormt-core-api/pom.xml"
+        "ormt-api/ormt-core-api/mvnw"
+        "ormt-api/ormt-content-api/pom.xml"
+        "ormt-api/ormt-content-api/mvnw"
+        "ormt-api/docker/app/env/.env.stage"
+        "ormt-api/docker/app/docker-compose.ormt-core-api.base.yml"
+        "ormt-api/docker/app/docker-compose.ormt-content-api.base.yml"
+        "ormt-web-v1/package.json"
+        "ormt-web-v1/angular.json"
+        "ormt-web-v1/Dockerfile"
+        "ormt-web-v1/src/environments/environment.stage.ts"
+      )
+      ;;
+    *) die "Périmètre de sources invalide: $scope" ;;
+  esac
 
   for relative in "${required[@]}"; do
     if ! test -e "$root/$relative"; then
@@ -118,15 +144,20 @@ normalize_build_wrappers() {
 
 sync_provided_sources() {
   local root="$1"
-  validate_source_tree "$root" ||
-    die "Les dossiers fournis sont incomplets dans: $root"
+  local scope="$2"
+  validate_source_tree "$root" "$scope" ||
+    die "Les dossiers fournis sont incomplets pour le périmètre $scope dans: $root"
 
   activate_source_paths provided
   mark_state source-mode provided
   mkdir -p "$(dirname "$ORMT_INFRA_DIR")"
-  copy_provided_project "$root/ormt-infra-stage-local-vps" "$ORMT_INFRA_DIR" "infrastructure"
-  copy_provided_project "$root/ormt-api" "$ORMT_API_DIR" "API"
-  copy_provided_project "$root/ormt-web-v1" "$ORMT_WEB_DIR" "frontend"
+  if test "$scope" = "infrastructure" || test "$scope" = "all"; then
+    copy_provided_project "$root/ormt-infra-stage-local-vps" "$ORMT_INFRA_DIR" "infrastructure"
+  fi
+  if test "$scope" = "stage" || test "$scope" = "all"; then
+    copy_provided_project "$root/ormt-api" "$ORMT_API_DIR" "API"
+    copy_provided_project "$root/ormt-web-v1" "$ORMT_WEB_DIR" "frontend"
+  fi
 }
 
 sync_git_project() {
@@ -202,6 +233,7 @@ sync_git_project() {
 }
 
 sync_git_sources() {
+  local scope="$1"
   if ! command -v git >/dev/null 2>&1; then
     log "Installation de Git requise pour récupérer les projets"
     sudo apt-get update
@@ -211,12 +243,16 @@ sync_git_sources() {
   activate_source_paths git
   mkdir -p "$ORMT_WSL_WORKSPACE"
   log "Mise à jour rapide des projets dans le système de fichiers WSL"
-  sync_git_project "$ORMT_INFRA_DIR" \
-    "$ORMT_INFRA_REPO_URL" "$ORMT_INFRA_BRANCH" "Infrastructure"
-  sync_git_project "$ORMT_API_DIR" \
-    "$ORMT_API_REPO_URL" "$ORMT_API_BRANCH" "API"
-  sync_git_project "$ORMT_WEB_DIR" \
-    "$ORMT_WEB_REPO_URL" "$ORMT_WEB_BRANCH" "Frontend"
+  if test "$scope" = "infrastructure" || test "$scope" = "all"; then
+    sync_git_project "$ORMT_INFRA_DIR" \
+      "$ORMT_INFRA_REPO_URL" "$ORMT_INFRA_BRANCH" "Infrastructure"
+  fi
+  if test "$scope" = "stage" || test "$scope" = "all"; then
+    sync_git_project "$ORMT_API_DIR" \
+      "$ORMT_API_REPO_URL" "$ORMT_API_BRANCH" "API"
+    sync_git_project "$ORMT_WEB_DIR" \
+      "$ORMT_WEB_REPO_URL" "$ORMT_WEB_BRANCH" "Frontend"
+  fi
   mark_state source-mode git
   mark_state source-origin git
 }
@@ -224,18 +260,19 @@ sync_git_sources() {
 resolve_source_mode() {
   local requested="${1,,}"
   local provided_root="$2"
+  local scope="$3"
 
   case "$requested" in
     provided)
-      validate_source_tree "$provided_root" ||
-        die "Le mode Provided exige les trois projets complets dans: $provided_root"
+      validate_source_tree "$provided_root" "$scope" ||
+        die "Le mode Provided est incomplet pour le périmètre $scope dans: $provided_root"
       printf 'provided\n'
       ;;
     git)
       printf 'git\n'
       ;;
     auto)
-      if validate_source_tree "$provided_root" >/dev/null 2>&1; then
+      if validate_source_tree "$provided_root" "$scope" >/dev/null 2>&1; then
         printf 'provided\n'
       else
         printf 'git\n'
@@ -250,15 +287,18 @@ resolve_source_mode() {
 prepare_sources() {
   local requested="$1"
   local provided_root="$2"
+  local scope="$3"
   local selected
-  selected="$(resolve_source_mode "$requested" "$provided_root")"
-  log "Provenance des projets sélectionnée: $selected"
+  selected="$(resolve_source_mode "$requested" "$provided_root" "$scope")"
+  log "Provenance des projets sélectionnée: $selected (périmètre: $scope)"
 
   case "$selected" in
     provided)
-      sync_provided_sources "$provided_root"
-      normalize_build_wrappers
+      sync_provided_sources "$provided_root" "$scope"
+      if test "$scope" = "stage" || test "$scope" = "all"; then
+        normalize_build_wrappers
+      fi
       ;;
-    git) sync_git_sources ;;
+    git) sync_git_sources "$scope" ;;
   esac
 }

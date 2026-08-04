@@ -251,8 +251,16 @@ prepare_environment() {
 }
 
 sync_sources() {
+  local scope
+  case "$MODE" in
+    infrastructure) scope="infrastructure" ;;
+    stage) scope="stage" ;;
+    full|repair) scope="all" ;;
+    *) die "Le mode $MODE ne prépare pas de sources." ;;
+  esac
+
   CURRENT_STEP="Préparation des sources"
-  prepare_sources "$SOURCE_MODE" "$PROVIDED_ROOT"
+  prepare_sources "$SOURCE_MODE" "$PROVIDED_ROOT" "$scope"
   CURRENT_STEP=""
 }
 
