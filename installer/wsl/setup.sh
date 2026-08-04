@@ -285,7 +285,9 @@ sync_sources() {
 }
 
 ensure_infrastructure() {
-  if "$SCRIPT_DIR/tests/test-infrastructure.sh"; then
+  if ! command -v docker >/dev/null 2>&1; then
+    log "Première installation détectée : Docker sera installé"
+  elif "$SCRIPT_DIR/tests/test-infrastructure.sh"; then
     log "Infrastructure déjà installée et validée"
     mark_state infrastructure-installed "$ORMT_INSTALL_DEV_TOOLS"
     mark_state infrastructure-validated

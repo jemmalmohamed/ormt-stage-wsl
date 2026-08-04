@@ -29,6 +29,10 @@ L'installateur effectue automatiquement :
 
 Aucune relance manuelle n'est requise après l'ajout au groupe Docker.
 
+Sur une distribution neuve, l'absence de Docker est reconnue comme un état
+normal de première installation : l'installateur ne présente plus une longue
+liste de contrôles en échec avant de commencer.
+
 Lors des modes `Full` et `Infrastructure`, l'installateur exécute également :
 
 ```powershell
@@ -150,6 +154,18 @@ Pendant les opérations longues, un point d'avancement est affiché toutes les
 15 secondes. Il indique la sous-étape contrôlée par l'installateur, l'activité
 détectée et, pendant les playbooks, la dernière tâche Ansible active. Ce suivi
 évite d'afficher des lignes de journal brutes pouvant contenir des identifiants.
+
+L'actualisation APT utilise les mécanismes Ubuntu standards : trois tentatives
+réseau et aucun téléchargement de traduction de descriptions de paquets. Si
+APT échoue, les éventuels fichiers de dépôts tiers sont signalés pour le
+diagnostic, mais l'installateur ne les supprime et ne les modifie jamais.
+Un catalogue actualisé depuis moins de 15 minutes est réutilisé afin d'éviter
+un second `apt-get update` pendant le même parcours.
+
+Pour les dépôts GitHub privés, le nom utilisateur et le jeton sont demandés par
+Git. Le jeton est placé uniquement dans le cache mémoire Git pendant 15 minutes,
+afin d'éviter plusieurs saisies durant les clones ; il n'est pas écrit dans la
+configuration du dépôt ou de l'installateur.
 
 Les images PostgreSQL, Keycloak, MinIO et Nextcloud sont également préchargées
 en parallèle. Les deux API sont compilées simultanément avec le cache Maven

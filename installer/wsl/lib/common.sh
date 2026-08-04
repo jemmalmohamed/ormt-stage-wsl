@@ -57,6 +57,58 @@ clear_progress() {
   rm -f "$ORMT_PROGRESS_FILE"
 }
 
+show_third_party_apt_sources() {
+  local apt_root="${1:-/etc/apt}"
+  local source_file=""
+  local urls=""
+  local found=false
+
+  while IFS= read -r source_file; do
+    urls="$(grep -Eo 'https?://[^ /]+' "$source_file" 2>/dev/null || true)"
+    test -n "$urls" || continue
+    if grep -Evq '(^|\.)ubuntu\.com$' <<< "$urls"; then
+      if test "$found" = false; then
+        printf '\nDépôts APT tiers actifs à contrôler :\n' >&2
+        found=true
+      fi
+      printf '  - %s\n' "$source_file" >&2
+      printf '%s\n' "$urls" | sed 's/^/      /' >&2
+    fi
+  done < <(
+    find "$apt_root" -maxdepth 2 -type f \
+      \( -name '*.list' -o -name '*.sources' \) -print 2>/dev/null | sort
+  )
+}
+
+update_apt_indexes() {
+  local updated_at=""
+  local now
+  now="$(date +%s)"
+  updated_at="$(state_value apt-indexes-updated-at 2>/dev/null || true)"
+
+  if [[ "$updated_at" =~ ^[0-9]+$ ]] &&
+    test "$((now - updated_at))" -ge 0 &&
+    test "$((now - updated_at))" -lt 900; then
+    log "Catalogues APT actualisés récemment : téléchargement ignoré"
+    return 0
+  fi
+
+  if sudo apt-get \
+    -o Acquire::Languages=none \
+    -o Acquire::Retries=3 \
+    update; then
+    mark_state apt-indexes-updated-at "$now"
+    return 0
+  fi
+
+  show_third_party_apt_sources
+  die "APT n'a pas pu actualiser les catalogues. Consulte les lignes Err ci-dessus; aucun dépôt n'a été modifié par ORMT."
+}
+
+install_apt_packages() {
+  sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
+}
+
 die() {
   printf '\nERREUR: %s\n' "$*" >&2
   exit 1

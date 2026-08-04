@@ -14,9 +14,9 @@ test -d "$ORMT_INFRA_DIR/ansible" ||
 
 log "Installation des prérequis système"
 set_progress "Paquets Ubuntu — actualisation des catalogues (apt-get update)"
-sudo apt-get update
+update_apt_indexes
 set_progress "Paquets Ubuntu — installation de Git, Ansible, Python, curl et des certificats"
-sudo apt-get install -y git ansible python3-pip curl ca-certificates
+install_apt_packages git ansible python3-pip curl ca-certificates
 
 log "Installation des collections Ansible"
 set_progress "Ansible Galaxy — installation des collections requises"

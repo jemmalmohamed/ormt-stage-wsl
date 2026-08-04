@@ -160,6 +160,10 @@ sync_provided_sources() {
   fi
 }
 
+git_remote() {
+  git -c credential.helper='cache --timeout=900' "$@"
+}
+
 sync_git_project() {
   local dir="$1"
   local url="$2"
@@ -192,10 +196,10 @@ sync_git_project() {
       fi
       if test "$(git -C "$dir" rev-parse --is-shallow-repository)" = "true"; then
         log "Approfondissement léger de l'historique Git superficiel"
-        git -C "$dir" fetch --progress --deepen 20 origin \
+        git_remote -C "$dir" fetch --progress --deepen 20 origin \
           "$branch_refspec"
       else
-        git -C "$dir" fetch --progress origin \
+        git_remote -C "$dir" fetch --progress origin \
           "$branch_refspec"
       fi
       if git -C "$dir" show-ref --verify --quiet "refs/heads/$branch"; then
@@ -210,9 +214,9 @@ sync_git_project() {
       test -n "$branch" || die "$name est positionné sur un commit détaché."
       if test "$(git -C "$dir" rev-parse --is-shallow-repository)" = "true"; then
         log "Approfondissement léger de l'historique Git superficiel"
-        git -C "$dir" fetch --progress --deepen 20 origin "$branch"
+        git_remote -C "$dir" fetch --progress --deepen 20 origin "$branch"
       else
-        git -C "$dir" fetch --progress origin "$branch"
+        git_remote -C "$dir" fetch --progress origin "$branch"
       fi
       target_ref="origin/$branch"
     fi
@@ -228,10 +232,10 @@ sync_git_project() {
     die "$name existe sans être un dépôt Git: $dir"
   elif test -n "$branch"; then
     log "Clonage de $name, branche $branch"
-    git clone --progress --depth 20 --branch "$branch" --single-branch "$url" "$dir"
+    git_remote clone --progress --depth 20 --branch "$branch" --single-branch "$url" "$dir"
   else
     log "Clonage de $name"
-    git clone --progress --depth 20 "$url" "$dir"
+    git_remote clone --progress --depth 20 "$url" "$dir"
   fi
 
   test -f "$dir/.git/index" ||
@@ -256,7 +260,7 @@ select_git_branch() {
   local branches=()
 
   for attempt in 1 2 3; do
-    if remote_heads="$(git ls-remote --heads "$url" 2>&1)"; then
+    if remote_heads="$(git_remote ls-remote --heads "$url" 2>&1)"; then
       remote_query_ok=true
       break
     fi
@@ -280,7 +284,7 @@ select_git_branch() {
     die "Aucune branche distante trouvée pour $name: $url"
 
   remote_default="$(
-    { git ls-remote --symref "$url" HEAD 2>/dev/null || true; } |
+    { git_remote ls-remote --symref "$url" HEAD 2>/dev/null || true; } |
       awk '$1 == "ref:" {sub("refs/heads/", "", $2); print $2; exit}'
   )"
 
@@ -346,13 +350,22 @@ sync_git_sources() {
   local web_branch="$ORMT_WEB_BRANCH"
   if ! command -v git >/dev/null 2>&1; then
     log "Installation de Git requise pour récupérer les projets"
-    sudo apt-get update
-    sudo apt-get install -y git ca-certificates
+    set_progress "Préparation Git — actualisation des catalogues Ubuntu"
+    update_apt_indexes
+    set_progress "Préparation Git — installation de Git et des certificats"
+    install_apt_packages git ca-certificates
+    clear_progress
   fi
 
   activate_source_paths git
   mkdir -p "$ORMT_WSL_WORKSPACE"
   log "Mise à jour rapide des projets dans le système de fichiers WSL"
+  if [[ "$ORMT_INFRA_REPO_URL$ORMT_API_REPO_URL$ORMT_WEB_REPO_URL" == *github.com* ]]; then
+    printf '\nSi GitHub demande des identifiants pour un dépôt privé :\n'
+    printf '  Username : ton nom utilisateur GitHub\n'
+    printf '  Password : ton jeton GitHub, saisi de manière masquée\n'
+    printf 'Le jeton est conservé uniquement en mémoire pendant 15 minutes.\n'
+  fi
   if test "${ORMT_SELECT_GIT_BRANCHES:-false}" = "true"; then
     if test "$scope" = "infrastructure" || test "$scope" = "all"; then
       infra_branch="$(select_git_branch \

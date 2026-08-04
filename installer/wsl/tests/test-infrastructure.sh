@@ -8,6 +8,11 @@ source "$SCRIPT_DIR/../lib/common.sh"
 require_linux
 failures=0
 
+if ! command -v docker >/dev/null 2>&1; then
+  printf '  [INFO] Infrastructure non installée : Docker est absent.\n'
+  exit 1
+fi
+
 check() {
   local label="$1"
   shift
