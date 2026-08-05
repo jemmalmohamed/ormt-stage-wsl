@@ -32,6 +32,13 @@ contenant uniquement les JAR compilés. La construction du Stage ne dépend donc
 pas des règles `.dockerignore` des dépôts applicatifs, qui peuvent rester
 adaptées au processus de production.
 
+Le Stage active également l'injection des utilisateurs Keycloak de test via une
+surcharge Compose locale à l'installateur. Le profil et le déploiement de
+production restent inchangés.
+
+Les branches applicatives utilisées par défaut pour l'API et le frontend sont
+`main`. Elles restent exécutées avec les fichiers et variables du profil Stage.
+
 Aucune relance manuelle n'est requise après l'ajout au groupe Docker.
 
 Sur une distribution neuve, l'absence de Docker est reconnue comme un état

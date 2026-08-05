@@ -25,8 +25,8 @@ ORMT_INFRA_REPO_URL="${ORMT_INFRA_REPO_URL:-https://github.com/jemmalmohamed/orm
 ORMT_API_REPO_URL="${ORMT_API_REPO_URL:-https://github.com/jemmalmohamed/ormt-api.git}"
 ORMT_WEB_REPO_URL="${ORMT_WEB_REPO_URL:-https://github.com/jemmalmohamed/ormt-web-v1.git}"
 ORMT_INFRA_BRANCH="${ORMT_INFRA_BRANCH:-}"
-ORMT_API_BRANCH="${ORMT_API_BRANCH:-micro-service}"
-ORMT_WEB_BRANCH="${ORMT_WEB_BRANCH:-micro-service}"
+ORMT_API_BRANCH="${ORMT_API_BRANCH:-main}"
+ORMT_WEB_BRANCH="${ORMT_WEB_BRANCH:-main}"
 ORMT_SELECT_GIT_BRANCHES="${ORMT_SELECT_GIT_BRANCHES:-false}"
 ORMT_SOURCE_MODE="${ORMT_SOURCE_MODE:-auto}"
 ORMT_WSL_WORKSPACE="${ORMT_WSL_WORKSPACE:-${HOME}/ormt-app}"
@@ -232,6 +232,7 @@ api_service_compose_args() {
     --env-file ./docker/app/env/.env.stage \
     -f ./docker/app/docker-compose.ormt-core-api.base.yml \
     -f ./docker/app/docker-compose.ormt-core-api.stage.yml \
+    -f "$WSL_ROOT/templates/docker-compose.ormt-core-api.stage-local.yml" \
     -f ./docker/app/docker-compose.ormt-content-api.base.yml \
     -f ./docker/app/docker-compose.ormt-content-api.stage.yml \
     --project-name ormt-services
