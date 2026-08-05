@@ -84,17 +84,23 @@ else
     die "Un seul JAR Content était attendu, trouvé: ${#content_jars[@]}"
   test -s "${content_jars[0]}" || die "JAR Content vide: ${content_jars[0]}"
 
+  runtime_context_root="$(mktemp -d)"
+  trap 'rm -rf "$runtime_context_root"' EXIT
+  mkdir -p "$runtime_context_root/core" "$runtime_context_root/content"
+  cp "$core_jar" "$runtime_context_root/core/app.jar"
+  cp "${content_jars[0]}" "$runtime_context_root/content/app.jar"
+
   set_progress "API Core + Content — création parallèle des images Docker d'exécution"
   log "Création parallèle des images d'exécution API"
-  (cd "$ORMT_API_DIR" &&
-    docker build \
-      --file "$WSL_ROOT/templates/ormt-core-api.runtime.Dockerfile" \
-      --tag ormt/ormt-core-api:latest .) &
+  docker build \
+    --file "$WSL_ROOT/templates/ormt-core-api.runtime.Dockerfile" \
+    --tag ormt/ormt-core-api:latest \
+    "$runtime_context_root/core" &
   core_image_pid=$!
-  (cd "$ORMT_API_DIR" &&
-    docker build \
-      --file "$WSL_ROOT/templates/ormt-content-api.runtime.Dockerfile" \
-      --tag ormt/ormt-content-api:latest .) &
+  docker build \
+    --file "$WSL_ROOT/templates/ormt-content-api.runtime.Dockerfile" \
+    --tag ormt/ormt-content-api:latest \
+    "$runtime_context_root/content" &
   content_image_pid=$!
 
   core_image_status=0
@@ -104,6 +110,8 @@ else
   if test "$core_image_status" -ne 0 || test "$content_image_status" -ne 0; then
     die "Échec de création des images Docker (Core=$core_image_status, Content=$content_image_status)"
   fi
+  rm -rf "$runtime_context_root"
+  trap - EXIT
   mark_build api "$api_fingerprint"
 fi
 

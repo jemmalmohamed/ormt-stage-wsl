@@ -27,6 +27,11 @@ L'installateur effectue automatiquement :
 7. les tests HTTP finaux ;
 8. la proposition facultative d'un test de redémarrage à froid de WSL.
 
+Les images d'exécution des API sont construites à partir de contextes temporaires
+contenant uniquement les JAR compilés. La construction du Stage ne dépend donc
+pas des règles `.dockerignore` des dépôts applicatifs, qui peuvent rester
+adaptées au processus de production.
+
 Aucune relance manuelle n'est requise après l'ajout au groupe Docker.
 
 Sur une distribution neuve, l'absence de Docker est reconnue comme un état
