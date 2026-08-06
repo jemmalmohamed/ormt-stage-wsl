@@ -164,6 +164,38 @@ git_remote() {
   git -c credential.helper='cache --timeout=900' "$@"
 }
 
+confirm_git_worktree_reinstall() {
+  local dir="$1"
+  local name="$2"
+  local confirmation=""
+
+  printf '\n============================================================\n' >&2
+  printf 'ATTENTION — MODIFICATIONS LOCALES DÉTECTÉES DANS %s\n' "$name" >&2
+  printf 'Dépôt : %s\n\n' "$dir" >&2
+  git -C "$dir" status --short >&2
+  printf '\nLes modifications suivies et les fichiers non suivis seront supprimés.\n' >&2
+  printf 'Les fichiers ignorés par Git, les volumes Docker et les données métier seront conservés.\n' >&2
+  printf 'Le dépôt sera ensuite remis à jour depuis la branche Git sélectionnée.\n' >&2
+  printf '============================================================\n\n' >&2
+
+  if ! test -t 0; then
+    die "La réinstallation de $name exige une confirmation interactive. Aucune modification locale n'a été supprimée."
+  fi
+  if ! read -r -p "Tape exactement REINSTALLER pour écraser ces modifications: " confirmation; then
+    die "Confirmation interactive indisponible. Aucune modification locale n'a été supprimée."
+  fi
+  if test "$confirmation" != "REINSTALLER"; then
+    printf '\nMise à jour Git annulée. Aucune modification locale n’a été supprimée.\n' >&2
+    exit 45
+  fi
+
+  log "Réinstallation des sources locales de $name"
+  git -C "$dir" reset --hard HEAD
+  git -C "$dir" clean -fd
+  test -z "$(git -C "$dir" status --porcelain)" ||
+    die "Le nettoyage du dépôt $name a échoué: $dir"
+}
+
 sync_git_project() {
   local dir="$1"
   local url="$2"
@@ -183,8 +215,9 @@ sync_git_project() {
   fi
 
   if test -d "$dir/.git"; then
-    test -z "$(git -C "$dir" status --porcelain)" ||
-      die "$name contient des modifications locales: $dir"
+    if test -n "$(git -C "$dir" status --porcelain)"; then
+      confirm_git_worktree_reinstall "$dir" "$name"
+    fi
 
     local target_ref=""
     if test -n "$branch"; then

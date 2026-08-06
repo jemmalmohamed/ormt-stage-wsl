@@ -128,10 +128,14 @@ les images Docker.
 ### Git rapide dans WSL
 
 Les URLs et branches se configurent dans `config/.env`. Le mode Git clone ou met
-à jour uniquement les dépôts requis dans `~/ormt-app/`, refuse d'écraser les
-modifications locales et utilise uniquement des mises à jour `fast-forward`.
-Aucun clonage ou copie automatique n'est effectué dans le dossier Windows monté
-sous `/mnt/`.
+à jour uniquement les dépôts requis dans `~/ormt-app/` et utilise des mises à
+jour `fast-forward`. Si un dépôt contient des modifications locales,
+l'installateur affiche leur liste et demande de taper exactement
+`REINSTALLER`. Cette confirmation supprime les modifications suivies et les
+fichiers non suivis avant de reprendre la mise à jour. Une autre réponse annule
+l'opération sans modifier le dépôt. Les fichiers ignorés par Git, les volumes
+Docker et les données métier sont conservés. Aucun clonage ou copie automatique
+n'est effectué dans le dossier Windows monté sous `/mnt/`.
 
 Après avoir choisi une provenance `Git` ou `Auto` dans le menu, l'installateur
 propose d'afficher les branches distantes. Si cette option est activée, chaque

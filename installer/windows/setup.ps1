@@ -367,6 +367,14 @@ if ($installerExitCode -eq 44) {
   exit 0
 }
 
+if ($installerExitCode -eq 45) {
+  Add-Content -LiteralPath $LogFile -Value "Réinstallation des sources Git annulée par l'utilisateur." -Encoding UTF8
+  Write-Host ""
+  Write-Host "Mise à jour Git annulée. Aucune modification locale n'a été supprimée." -ForegroundColor Green
+  Write-Host "Journal: $LogFile"
+  exit 0
+}
+
 if ($installerExitCode -ne 0) {
   Stop-WithMessage "L'installation WSL a echoue avec le code $installerExitCode."
 }
