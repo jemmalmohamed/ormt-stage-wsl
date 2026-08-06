@@ -214,8 +214,12 @@ sync_sources() {
 }
 
 ensure_infrastructure() {
+  local reapply="${1:-false}"
+
   if ! command -v docker >/dev/null 2>&1; then
     log "Première installation détectée : Docker sera installé"
+  elif test "$reapply" = "true"; then
+    log "Réapplication de la configuration de l’infrastructure"
   elif "$SCRIPT_DIR/tests/test-infrastructure.sh"; then
     log "Infrastructure déjà installée et validée"
     mark_state infrastructure-installed "$ORMT_INSTALL_DEV_TOOLS"
@@ -310,7 +314,7 @@ case "$MODE" in
   infrastructure)
     prepare_environment
     sync_sources
-    ensure_infrastructure
+    ensure_infrastructure true
     ;;
   stage)
     prepare_environment
@@ -322,7 +326,7 @@ case "$MODE" in
   full)
     prepare_environment
     sync_sources
-    ensure_infrastructure
+    ensure_infrastructure true
     install_stage
     ;;
   repair)

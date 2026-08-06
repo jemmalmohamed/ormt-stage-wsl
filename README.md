@@ -143,6 +143,13 @@ dépôt requis ayant plusieurs branches présente une liste numérotée. La bran
 configurée dans `config/.env`, ou à défaut la branche principale distante, est
 présélectionnée. Un dépôt avec une seule branche est sélectionné automatiquement.
 
+Les modes `Infrastructure` et `Full` réappliquent systématiquement le playbook
+d'infrastructure après la synchronisation des sources, même lorsque les
+services existants sont déjà opérationnels. Cette opération idempotente déploie
+les nouvelles routes, fichiers Compose et configurations sans supprimer les
+volumes ni les données existantes. Le mode `Repair` conserve son contrôle rapide
+et ne réapplique l'infrastructure que si sa validation échoue.
+
 Si un clonage a été interrompu avant la création de son index Git,
 l'installateur conserve le dossier dans un sous-dossier `.incomplete/` de
 `~/ormt-app/` puis recrée automatiquement un clone propre au lancement suivant.
