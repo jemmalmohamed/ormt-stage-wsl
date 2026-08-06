@@ -25,19 +25,19 @@ $hostsPath = Join-Path $env:SystemRoot "System32\drivers\etc\hosts"
 $beginMarker = "# BEGIN ORMT STAGE DOMAINS"
 $endMarker = "# END ORMT STAGE DOMAINS"
 $domains = @(
-  "ormt.local",
-  "api.ormt.local",
-  "content-api.ormt.local",
-  "keycloak.ormt.local",
-  "minio.ormt.local",
-  "minio-console.ormt.local",
-  "nextcloud.ormt.local",
-  "proxy.ormt.local",
-  "containers.ormt.local",
-  "jenkins.ormt.local",
-  "homepage.ormt.local",
-  "grafana.ormt.local",
-  "prometheus.ormt.local"
+  "ormt.localhost",
+  "ormt-core-api.localhost",
+  "ormt-content-api.localhost",
+  "users.ormt.localhost",
+  "minio.ormt.localhost",
+  "minio-console.ormt.localhost",
+  "nextcloud.ormt.localhost",
+  "proxy.ormt.localhost",
+  "containers.ormt.localhost",
+  "jenkins.ormt.localhost",
+  "homepage.ormt.localhost",
+  "grafana.ormt.localhost",
+  "prometheus.ormt.localhost"
 )
 
 $content = Get-Content -LiteralPath $hostsPath -Raw

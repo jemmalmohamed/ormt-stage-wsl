@@ -18,7 +18,7 @@ Double-clique sur :
 
 L'installateur effectue automatiquement :
 
-1. l'enregistrement des domaines `*.ormt.local` dans le fichier `hosts` Windows ;
+1. l'enregistrement des domaines `*.ormt.localhost` dans le fichier `hosts` Windows ;
 2. la préparation d'Ubuntu WSL et de `systemd` ;
 3. la sélection d'`Ubuntu-24.04` comme distribution WSL par défaut ;
 4. l'installation de l'infrastructure complète ;
@@ -248,7 +248,7 @@ minimal et confirmation explicite avec `REINSTALLER`.
 ## Maintenance globale locale
 
 L'option `7. Maintenance globale locale` active ou désactive la page de secours
-sur `http://ormt.local`. Elle utilise automatiquement le dépôt infrastructure
+sur `http://ormt.localhost`. Elle utilise automatiquement le dépôt infrastructure
 sélectionné lors de la dernière installation, exécute le playbook Ansible et
 vérifie le résultat. Elle ne reconstruit pas le Stage et ne supprime aucun
 conteneur métier, volume ou donnée.
@@ -286,20 +286,20 @@ utilise par exemple :
 
 ## URLs principales
 
-- Frontend : http://ormt.local
-- API : http://api.ormt.local/api/v1
-- API de contenu : http://content-api.ormt.local/api/v1
-- Swagger : http://api.ormt.local/v3/api-docs
-- Keycloak : http://keycloak.ormt.local
-- MinIO : http://minio.ormt.local
-- Console MinIO : http://minio-console.ormt.local
-- Nextcloud : http://nextcloud.ormt.local
-- Traefik : http://proxy.ormt.local
-- Portainer : http://containers.ormt.local
-- Jenkins : http://jenkins.ormt.local
-- Homepage : http://homepage.ormt.local
-- Grafana : http://grafana.ormt.local
-- Prometheus : http://prometheus.ormt.local
+- Frontend : http://ormt.localhost
+- API : http://ormt-core-api.localhost/api/v1
+- API de contenu : http://ormt-content-api.localhost/api/v1
+- Swagger : http://ormt-core-api.localhost/v3/api-docs
+- Keycloak : http://users.ormt.localhost
+- MinIO : http://minio.ormt.localhost
+- Console MinIO : http://minio-console.ormt.localhost
+- Nextcloud : http://nextcloud.ormt.localhost
+- Traefik : http://proxy.ormt.localhost
+- Portainer : http://containers.ormt.localhost
+- Jenkins : http://jenkins.ormt.localhost
+- Homepage : http://homepage.ormt.localhost
+- Grafana : http://grafana.ormt.localhost
+- Prometheus : http://prometheus.ormt.localhost
 
 ## Identifiants de test
 

@@ -217,7 +217,7 @@ if ($Mode -ne "RemoveWsl") {
   Write-Step "Configuration des domaines locaux ORMT"
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $LocalDomainsScript
   if ($LASTEXITCODE -ne 0) {
-    Stop-WithMessage "Impossible de configurer les domaines *.ormt.local dans le fichier hosts Windows."
+    Stop-WithMessage "Impossible de configurer les domaines *.ormt.localhost dans le fichier hosts Windows."
   }
 }
 
@@ -310,7 +310,7 @@ if ($Mode -in @("MaintenanceOn", "MaintenanceOff")) {
 
   Write-Host ""
   Write-Host "$maintenanceLabel de la maintenance terminée et vérifiée." -ForegroundColor Green
-  Write-Host "URL: http://ormt.local" -ForegroundColor Green
+  Write-Host "URL: http://ormt.localhost" -ForegroundColor Green
   Write-Host "Journal: $LogFile"
   exit 0
 }

@@ -28,15 +28,15 @@ log "État des conteneurs Stage"
 docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
 
 log "Tests HTTP Stage"
-check_http "Traefik" '200|301|302|404' --header "Host: proxy.ormt.local" http://127.0.0.1/
-check_http "Frontend" '200|301|302' --header "Host: ormt.local" http://127.0.0.1/
-check_http "API Swagger" '200' --header "Host: api.ormt.local" http://127.0.0.1/v3/api-docs
-check_http "API Partenaires" '200' --header "Host: content-api.ormt.local" http://127.0.0.1/api/v1/public/partenaires
-check_http "API Publications" '200' --header "Host: content-api.ormt.local" 'http://127.0.0.1/api/v1/public/publications?pageSize=1'
-check_http "API Observatoire" '200' --header "Host: content-api.ormt.local" http://127.0.0.1/api/v1/public/observatoire-content/current
-check_http "Nextcloud" '200' --header "Host: nextcloud.ormt.local" http://127.0.0.1/status.php
-check_http "Keycloak master" '200' --header "Host: keycloak.ormt.local" http://127.0.0.1/realms/master
-check_http "MinIO" '200' --header "Host: minio.ormt.local" http://127.0.0.1/minio/health/live
+check_http "Traefik" '200|301|302|404' --header "Host: proxy.ormt.localhost" http://127.0.0.1/
+check_http "Frontend" '200|301|302' --header "Host: ormt.localhost" http://127.0.0.1/
+check_http "API Swagger" '200' --header "Host: ormt-core-api.localhost" http://127.0.0.1/v3/api-docs
+check_http "API Partenaires" '200' --header "Host: ormt-content-api.localhost" http://127.0.0.1/api/v1/public/partenaires
+check_http "API Publications" '200' --header "Host: ormt-content-api.localhost" 'http://127.0.0.1/api/v1/public/publications?pageSize=1'
+check_http "API Observatoire" '200' --header "Host: ormt-content-api.localhost" http://127.0.0.1/api/v1/public/observatoire-content/current
+check_http "Nextcloud" '200' --header "Host: nextcloud.ormt.localhost" http://127.0.0.1/status.php
+check_http "Keycloak master" '200' --header "Host: users.ormt.localhost" http://127.0.0.1/realms/master
+check_http "MinIO" '200' --header "Host: minio.ormt.localhost" http://127.0.0.1/minio/health/live
 check_http "Keycloak ORMT" '200' http://127.0.0.1:8092/realms/ormt
 check_http "MinIO" '200' http://127.0.0.1:9000/minio/health/live
 

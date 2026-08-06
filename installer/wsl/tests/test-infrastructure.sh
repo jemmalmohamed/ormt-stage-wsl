@@ -53,7 +53,7 @@ check "Utilisateur dans le groupe docker" bash -c "id -nG | tr ' ' '\n' | grep -
 check "Docker accessible sans sudo" docker ps
 check "Réseau proxy présent" docker network inspect proxy
 check_container "Traefik actif" traefik
-check_route "Route Traefik" proxy.ormt.local
+check_route "Route Traefik" proxy.ormt.localhost
 
 if test "$ORMT_INSTALL_DEV_TOOLS" = "true"; then
   check_container "Portainer actif" portainer
@@ -63,11 +63,11 @@ if test "$ORMT_INSTALL_DEV_TOOLS" = "true"; then
   check_container "Prometheus actif" prometheus
   check_container "cAdvisor actif" cadvisor
   check_container "Node Exporter actif" node_exporter
-  check_route "Route Portainer" containers.ormt.local
-  check_route "Route Jenkins" jenkins.ormt.local
-  check_route "Route Homepage" homepage.ormt.local
-  check_route "Route Grafana" grafana.ormt.local
-  check_route "Route Prometheus" prometheus.ormt.local
+  check_route "Route Portainer" containers.ormt.localhost
+  check_route "Route Jenkins" jenkins.ormt.localhost
+  check_route "Route Homepage" homepage.ormt.localhost
+  check_route "Route Grafana" grafana.ormt.localhost
+  check_route "Route Prometheus" prometheus.ormt.localhost
 fi
 
 if test "$failures" -ne 0; then

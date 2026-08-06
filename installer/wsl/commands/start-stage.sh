@@ -43,8 +43,8 @@ compose_up "$ORMT_API_DIR" \
 
 wait_for_container_health ormt-database 60
 wait_for_container_health minio-ormt 60
-wait_for_host_route "Keycloak (realm master)" "keycloak.ormt.local" "/realms/master" 90
-wait_for_host_route "Nextcloud" "nextcloud.ormt.local" "/status.php" 90
+wait_for_host_route "Keycloak (realm master)" "users.ormt.localhost" "/realms/master" 90
+wait_for_host_route "Nextcloud" "nextcloud.ormt.localhost" "/status.php" 90
 
 api_fingerprint="$(source_fingerprint "$ORMT_API_DIR")"
 if build_is_current api "$api_fingerprint" && api_image_exists; then
@@ -120,10 +120,10 @@ log "Démarrage des APIs"
 (cd "$ORMT_API_DIR" &&
   docker compose "${api_args[@]}" up -d --force-recreate --remove-orphans)
 
-wait_for_host_route "API Core" "api.ormt.local" "/v3/api-docs" 90
-wait_for_host_route "Keycloak (realm ORMT configuré par Core API)" "keycloak.ormt.local" "/realms/ormt" 90
-wait_for_host_route "API Content" "content-api.ormt.local" "/api/v1/public/partenaires" 90
-wait_for_host_route "API Content Publications" "content-api.ormt.local" "/api/v1/public/publications?pageSize=1" 90
+wait_for_host_route "API Core" "ormt-core-api.localhost" "/v3/api-docs" 90
+wait_for_host_route "Keycloak (realm ORMT configuré par Core API)" "users.ormt.localhost" "/realms/ormt" 90
+wait_for_host_route "API Content" "ormt-content-api.localhost" "/api/v1/public/partenaires" 90
+wait_for_host_route "API Content Publications" "ormt-content-api.localhost" "/api/v1/public/publications?pageSize=1" 90
 
 web_fingerprint="$(source_fingerprint "$ORMT_WEB_DIR")"
 if build_is_current web "$web_fingerprint" && web_image_exists; then
@@ -149,15 +149,15 @@ compose_up "$ORMT_WEB_DIR" \
   --project-name ormt-web-stage
 
 wait_for_container_health ormt-web-stage 60
-wait_for_host_route "Frontend Stage" "ormt.local" "/" 60
+wait_for_host_route "Frontend Stage" "ormt.localhost" "/" 60
 clear_progress
 
 cat <<'MSG'
 
 Stage démarré.
-  Frontend : http://ormt.local
-  API Core : http://api.ormt.local/api/v1
-  API Content : http://content-api.ormt.local/api/v1
-  Keycloak : http://keycloak.ormt.local
-  MinIO    : http://minio.ormt.local
+  Frontend : http://ormt.localhost
+  API Core : http://ormt-core-api.localhost/api/v1
+  API Content : http://ormt-content-api.localhost/api/v1
+  Keycloak : http://users.ormt.localhost
+  MinIO    : http://minio.ormt.localhost
 MSG

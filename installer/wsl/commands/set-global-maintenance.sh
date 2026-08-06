@@ -59,7 +59,7 @@ log "Application de maintenance_active=$ACTIVE"
 )
 
 if test "$ACTIVE" = "true"; then
-  log "Maintenance locale activée et vérifiée sur http://ormt.local"
+  log "Maintenance locale activée et vérifiée sur http://ormt.localhost"
 else
-  log "Maintenance locale désactivée et vérifiée sur http://ormt.local"
+  log "Maintenance locale désactivée et vérifiée sur http://ormt.localhost"
 fi

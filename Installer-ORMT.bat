@@ -169,7 +169,7 @@ echo ============================================================
 echo              MAINTENANCE GLOBALE LOCALE
 echo ============================================================
 echo.
-echo Action : %MAINTENANCE_ACTION% la maintenance sur http://ormt.local
+echo Action : %MAINTENANCE_ACTION% la maintenance sur http://ormt.localhost
 echo Les conteneurs metier et leurs donnees seront conserves.
 echo.
 set "CONTINUE_CHOICE="
@@ -181,7 +181,7 @@ set "MAINTENANCE_EXIT=%ERRORLEVEL%"
 echo.
 if "%MAINTENANCE_EXIT%"=="0" (
   echo Operation terminee avec succes.
-  echo URL : http://ormt.local
+  echo URL : http://ormt.localhost
 ) else (
   echo Operation en echec. Consulte le dernier journal dans logs.
 )
