@@ -1,5 +1,5 @@
 ﻿param(
-  [ValidateSet("Full", "Infrastructure", "Stage", "Diagnostic", "Repair", "ResetStage", "RemoveWsl", "RestartWsl")]
+  [ValidateSet("Full", "Infrastructure", "Stage", "Diagnostic", "Repair", "MaintenanceOn", "MaintenanceOff", "ResetStage", "RemoveWsl", "RestartWsl")]
   [string]$Mode = "Full",
 
   [ValidateSet("Auto", "Provided", "Git")]
@@ -272,7 +272,7 @@ if ($Mode -eq "RestartWsl") {
 $hasDistro = Test-WslReady
 
 if (-not $hasDistro) {
-  if ($Mode -in @("Diagnostic", "ResetStage")) {
+  if ($Mode -in @("Diagnostic", "MaintenanceOn", "MaintenanceOff", "ResetStage")) {
     Stop-WithMessage "$Distro n'est pas installée; le mode $Mode n'est pas possible."
   }
   Write-Step "Installation de $Distro"
@@ -293,6 +293,26 @@ if (-not (Wait-WslReady)) {
   if (-not (Wait-WslReady)) {
     Stop-WithMessage "$Distro n'a pas pu etre initialisee."
   }
+}
+
+if ($Mode -in @("MaintenanceOn", "MaintenanceOff")) {
+  $maintenanceActive = if ($Mode -eq "MaintenanceOn") { "true" } else { "false" }
+  $maintenanceLabel = if ($Mode -eq "MaintenanceOn") { "Activation" } else { "Désactivation" }
+  $maintenanceWslLogFile = Convert-ToWslPath -WindowsPath $LogFile
+  Write-Step "$maintenanceLabel de la maintenance globale locale"
+  & wsl.exe -d $Distro --cd $PackageRoot -- `
+    bash ./installer/wsl/commands/set-global-maintenance.sh `
+      --active $maintenanceActive `
+      --log-file $maintenanceWslLogFile
+  if ($LASTEXITCODE -ne 0) {
+    Stop-WithMessage "La commande de maintenance globale locale a échoué."
+  }
+
+  Write-Host ""
+  Write-Host "$maintenanceLabel de la maintenance terminée et vérifiée." -ForegroundColor Green
+  Write-Host "URL: http://ormt.local" -ForegroundColor Green
+  Write-Host "Journal: $LogFile"
+  exit 0
 }
 
 if ($Mode -in @("Full", "Infrastructure")) {

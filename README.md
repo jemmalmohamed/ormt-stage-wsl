@@ -73,7 +73,8 @@ distributions WSL.
 4. Vérifier l'installation
 5. Réparer ou reprendre
 6. Configuration
-7. Réinitialisation / suppression
+7. Maintenance globale locale
+8. Réinitialisation / suppression
 0. Quitter
 ```
 
@@ -221,6 +222,8 @@ Depuis PowerShell :
 .\installer\windows\setup.ps1 -Mode Repair -SourceMode Auto
 .\installer\windows\setup.ps1 -Mode Full -FinalWslRestart Always
 .\installer\windows\setup.ps1 -Mode Diagnostic -FinalWslRestart Never
+.\installer\windows\setup.ps1 -Mode MaintenanceOn
+.\installer\windows\setup.ps1 -Mode MaintenanceOff
 .\installer\windows\setup.ps1 -Mode ResetStage -ConfirmDestructive
 .\installer\windows\setup.ps1 -Mode RemoveWsl -ConfirmDestructive
 .\installer\windows\setup.ps1 -Mode RestartWsl
@@ -234,15 +237,28 @@ cd ~/ormt-app/ormt-stage-wsl
 ./installer/wsl/commands/start-stage.sh
 ./installer/wsl/commands/stop-stage.sh
 ./installer/wsl/commands/reset-stage.sh
+./installer/wsl/commands/set-global-maintenance.sh --active true
+./installer/wsl/commands/set-global-maintenance.sh --active false
 ```
 
 `reset-stage.sh` est destructif et demande de saisir `RESET` lorsqu'il est lancé
 directement. Le mode `Stage` l'appelle seulement après validation du socle
 minimal et confirmation explicite avec `REINSTALLER`.
 
+## Maintenance globale locale
+
+L'option `7. Maintenance globale locale` active ou désactive la page de secours
+sur `http://ormt.local`. Elle utilise automatiquement le dépôt infrastructure
+sélectionné lors de la dernière installation, exécute le playbook Ansible et
+vérifie le résultat. Elle ne reconstruit pas le Stage et ne supprime aucun
+conteneur métier, volume ou donnée.
+
+L'action exige que l'infrastructure ait déjà été installée et que Docker soit
+accessible dans `Ubuntu-24.04`.
+
 ## Réinitialisation et nouveau départ
 
-L'option `7. Réinitialisation / suppression` du menu propose deux niveaux :
+L'option `8. Réinitialisation / suppression` du menu propose deux niveaux :
 
 - **Réinitialiser uniquement le Stage métier** supprime ses conteneurs, volumes
   et données (PostgreSQL, Keycloak, MinIO, Nextcloud, API et frontend). Ubuntu

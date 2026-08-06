@@ -15,14 +15,16 @@ echo  3. Stage metier uniquement
 echo  4. Verifier l'installation
 echo  5. Reparer ou reprendre
 echo  6. Configuration
-echo  7. Reinitialisation / suppression
+echo  7. Maintenance globale locale
+echo  8. Reinitialisation / suppression
 echo  0. Quitter
 echo.
 set "MENU_CHOICE="
 set /p "MENU_CHOICE=Votre choix puis Entree: "
 
 if "%MENU_CHOICE%"=="0" exit /b 0
-if "%MENU_CHOICE%"=="7" goto MAINTENANCE
+if "%MENU_CHOICE%"=="8" goto MAINTENANCE
+if "%MENU_CHOICE%"=="7" goto GLOBAL_MAINTENANCE
 if "%MENU_CHOICE%"=="6" goto CONFIGURATION
 if "%MENU_CHOICE%"=="5" goto MODE_REPAIR
 if "%MENU_CHOICE%"=="4" goto MODE_DIAGNOSTIC
@@ -132,6 +134,58 @@ if not exist "%~dp0config\.env" copy /Y "%~dp0config\.env.example" "%~dp0config\
 start "" notepad.exe "%~dp0config\.env"
 echo.
 echo Enregistre le fichier puis relance l'installation.
+pause
+goto MENU
+
+:GLOBAL_MAINTENANCE
+cls
+echo ============================================================
+echo              MAINTENANCE GLOBALE LOCALE
+echo ============================================================
+echo.
+echo  1. Activer la page de maintenance
+echo  2. Desactiver la page de maintenance
+echo  0. Retour
+echo.
+set "GLOBAL_MAINTENANCE_CHOICE="
+set /p "GLOBAL_MAINTENANCE_CHOICE=Votre choix puis Entree: "
+if "%GLOBAL_MAINTENANCE_CHOICE%"=="0" goto MENU
+if "%GLOBAL_MAINTENANCE_CHOICE%"=="2" goto MAINTENANCE_OFF
+if "%GLOBAL_MAINTENANCE_CHOICE%"=="1" goto MAINTENANCE_ON
+goto GLOBAL_MAINTENANCE
+
+:MAINTENANCE_ON
+set "MAINTENANCE_MODE=MaintenanceOn"
+set "MAINTENANCE_ACTION=activer"
+goto RUN_GLOBAL_MAINTENANCE
+
+:MAINTENANCE_OFF
+set "MAINTENANCE_MODE=MaintenanceOff"
+set "MAINTENANCE_ACTION=desactiver"
+
+:RUN_GLOBAL_MAINTENANCE
+cls
+echo ============================================================
+echo              MAINTENANCE GLOBALE LOCALE
+echo ============================================================
+echo.
+echo Action : %MAINTENANCE_ACTION% la maintenance sur http://ormt.local
+echo Les conteneurs metier et leurs donnees seront conserves.
+echo.
+set "CONTINUE_CHOICE="
+set /p "CONTINUE_CHOICE=Continuer ? [O/N] puis Entree: "
+if /I not "%CONTINUE_CHOICE%"=="O" goto GLOBAL_MAINTENANCE
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer\windows\setup.ps1" -Mode "%MAINTENANCE_MODE%"
+set "MAINTENANCE_EXIT=%ERRORLEVEL%"
+echo.
+if "%MAINTENANCE_EXIT%"=="0" (
+  echo Operation terminee avec succes.
+  echo URL : http://ormt.local
+) else (
+  echo Operation en echec. Consulte le dernier journal dans logs.
+)
+echo.
 pause
 goto MENU
 
