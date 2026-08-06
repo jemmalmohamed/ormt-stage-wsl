@@ -29,6 +29,7 @@ New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $LogFile = Join-Path $LogDir ("setup-{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
 $StartedAt = Get-Date
 $ReinstallStage = ($Mode -eq "Stage")
+$LocalDomainsScript = Join-Path $PSScriptRoot "configure-local-domains.ps1"
 
 if ([string]::IsNullOrWhiteSpace($ProvidedSourcesDir)) {
   $ProvidedSourcesDir = Join-Path $PackageRoot "sources"
@@ -212,6 +213,14 @@ if (-not $wslCommand) {
   Stop-WithMessage "WSL n'est pas disponible sur ce PC."
 }
 
+if ($Mode -ne "RemoveWsl") {
+  Write-Step "Configuration des domaines locaux ORMT"
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $LocalDomainsScript
+  if ($LASTEXITCODE -ne 0) {
+    Stop-WithMessage "Impossible de configurer les domaines *.ormt.local dans le fichier hosts Windows."
+  }
+}
+
 if ($Mode -eq "RemoveWsl") {
   if (-not $ConfirmDestructive) {
     Stop-WithMessage "La suppression complète exige le paramètre -ConfirmDestructive."
@@ -229,6 +238,11 @@ if ($Mode -eq "RemoveWsl") {
   & wsl.exe --unregister $Distro
   if ($LASTEXITCODE -ne 0) {
     Stop-WithMessage "La suppression de la distribution $Distro a échoué."
+  }
+
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $LocalDomainsScript -Remove
+  if ($LASTEXITCODE -ne 0) {
+    Stop-WithMessage "Ubuntu a été supprimé, mais le nettoyage des domaines ORMT locaux a échoué."
   }
 
   Write-Host ""

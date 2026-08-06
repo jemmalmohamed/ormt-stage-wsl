@@ -18,14 +18,20 @@ Double-clique sur :
 
 L'installateur effectue automatiquement :
 
-1. la préparation d'Ubuntu WSL et de `systemd` ;
-2. la sélection d'`Ubuntu-24.04` comme distribution WSL par défaut ;
-3. l'installation de l'infrastructure complète ;
-4. le redémarrage de WSL lorsque le groupe Docker doit être actualisé ;
-5. la validation de l'infrastructure ;
-6. la construction et le démarrage du Stage métier ;
-7. les tests HTTP finaux ;
-8. la proposition facultative d'un test de redémarrage à froid de WSL.
+1. l'enregistrement des domaines `*.ormt.local` dans le fichier `hosts` Windows ;
+2. la préparation d'Ubuntu WSL et de `systemd` ;
+3. la sélection d'`Ubuntu-24.04` comme distribution WSL par défaut ;
+4. l'installation de l'infrastructure complète ;
+5. le redémarrage de WSL lorsque le groupe Docker doit être actualisé ;
+6. la validation de l'infrastructure ;
+7. la construction et le démarrage du Stage métier ;
+8. les tests HTTP finaux ;
+9. la proposition facultative d'un test de redémarrage à froid de WSL.
+
+Windows affiche une demande d'autorisation administrateur pour mettre à jour
+le fichier `C:\Windows\System32\drivers\etc\hosts`. Accepte-la afin que les
+adresses Stage soient accessibles depuis le navigateur. L'installateur gère un
+bloc ORMT isolé et le retire lors de la suppression complète de la distribution.
 
 Les images d'exécution des API sont construites à partir de contextes temporaires
 contenant uniquement les JAR compilés. La construction du Stage ne dépend donc
@@ -253,17 +259,20 @@ utilise par exemple :
 
 ## URLs principales
 
-- Frontend : http://ormt-web.localhost
-- API : http://ormt-core-api.localhost/api/v1
-- Swagger : http://ormt-core-api.localhost/v3/api-docs
-- Keycloak : http://localhost:8092
-- MinIO : http://localhost:9000
-- Traefik : http://traefik.localhost
-- Portainer : http://portainer.localhost
-- Jenkins : http://jenkins.localhost
-- Homepage : http://lab.localhost
-- Grafana : http://grafana.localhost
-- Prometheus : http://prometheus.localhost
+- Frontend : http://ormt.local
+- API : http://api.ormt.local/api/v1
+- API de contenu : http://content-api.ormt.local/api/v1
+- Swagger : http://api.ormt.local/v3/api-docs
+- Keycloak : http://keycloak.ormt.local
+- MinIO : http://minio.ormt.local
+- Console MinIO : http://minio-console.ormt.local
+- Nextcloud : http://nextcloud.ormt.local
+- Traefik : http://traefik.ormt.local
+- Portainer : http://portainer.ormt.local
+- Jenkins : http://jenkins.ormt.local
+- Homepage : http://homepage.ormt.local
+- Grafana : http://grafana.ormt.local
+- Prometheus : http://prometheus.ormt.local
 
 ## Identifiants de test
 

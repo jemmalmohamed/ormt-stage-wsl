@@ -47,7 +47,7 @@ check "Utilisateur dans le groupe docker" bash -c "id -nG | tr ' ' '\n' | grep -
 check "Docker accessible sans sudo" docker ps
 check "Réseau proxy présent" docker network inspect proxy
 check_container "Traefik actif" traefik
-check_route "Route Traefik" traefik.localhost
+check_route "Route Traefik" traefik.ormt.local
 
 if test "$failures" -ne 0; then
   docker ps -a --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}' >&2 || true
