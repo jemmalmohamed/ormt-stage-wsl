@@ -1,4 +1,5 @@
 services:
   ormt-core-api:
     environment:
-      STARTER_KEYCLOAK_SEED_USERS: "true"
+      STARTER_KEYCLOAK_SEED_USERS: "false"
+      STARTER_KEYCLOAK_RECONCILIATION_MODE: "APPLY"
