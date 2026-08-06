@@ -28,7 +28,7 @@ log "État des conteneurs Stage"
 docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
 
 log "Tests HTTP Stage"
-check_http "Traefik" '200|301|302|404' --header "Host: traefik.ormt.local" http://127.0.0.1/
+check_http "Traefik" '200|301|302|404' --header "Host: proxy.ormt.local" http://127.0.0.1/
 check_http "Frontend" '200|301|302' --header "Host: ormt.local" http://127.0.0.1/
 check_http "API Swagger" '200' --header "Host: api.ormt.local" http://127.0.0.1/v3/api-docs
 check_http "API Partenaires" '200' --header "Host: content-api.ormt.local" http://127.0.0.1/api/v1/public/partenaires

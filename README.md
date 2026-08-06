@@ -267,8 +267,8 @@ utilise par exemple :
 - MinIO : http://minio.ormt.local
 - Console MinIO : http://minio-console.ormt.local
 - Nextcloud : http://nextcloud.ormt.local
-- Traefik : http://traefik.ormt.local
-- Portainer : http://portainer.ormt.local
+- Traefik : http://proxy.ormt.local
+- Portainer : http://containers.ormt.local
 - Jenkins : http://jenkins.ormt.local
 - Homepage : http://homepage.ormt.local
 - Grafana : http://grafana.ormt.local
