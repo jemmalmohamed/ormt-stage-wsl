@@ -34,9 +34,10 @@ adresses Stage soient accessibles depuis le navigateur. L'installateur gère un
 bloc ORMT isolé et le retire lors de la suppression complète de la distribution.
 
 Les images d'exécution des API sont construites à partir de contextes temporaires
-contenant uniquement les JAR compilés. La construction du Stage ne dépend donc
-pas des règles `.dockerignore` des dépôts applicatifs, qui peuvent rester
-adaptées au processus de production.
+contenant uniquement les JAR compilés. L'image du renderer PDF est construite
+depuis `ormt-api/ormt-pdf-renderer` avec l'image officielle Playwright. La
+construction du Stage ne dépend donc pas des règles `.dockerignore` des dépôts
+applicatifs, qui peuvent rester adaptées au processus de production.
 
 Le Stage active également l'injection des utilisateurs Keycloak de test via une
 surcharge Compose locale à l'installateur. Le profil et le déploiement de
@@ -198,7 +199,13 @@ configuration du dépôt ou de l'installateur.
 
 Les images PostgreSQL, Keycloak, MinIO et Nextcloud sont également préchargées
 en parallèle. Les deux API sont compilées simultanément avec le cache Maven
-persistant de WSL, puis seules leurs images d'exécution sont assemblées.
+persistant de WSL. Leurs images d'exécution et celle du renderer PDF sont
+ensuite assemblées en parallèle. Le contrôle final exige que le renderer PDF
+soit déclaré `healthy` et que son endpoint local
+`http://localhost:3010/health` réponde avant de valider le Stage. Ce port est
+publié uniquement pour le diagnostic local ; le Core API conteneurisé continue
+d'appeler le renderer par son nom de service interne
+`http://ormt-pdf-renderer:3010`.
 
 L'état persistant est conservé dans :
 

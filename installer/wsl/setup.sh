@@ -292,7 +292,7 @@ repair_installation() {
   fi
 
   log "Tentative de redémarrage des conteneurs métier existants"
-  docker start ormt-core-api ormt-content-api ormt-web-stage >/dev/null 2>&1 || true
+  docker start ormt-core-api ormt-content-api ormt-pdf-renderer ormt-web-stage >/dev/null 2>&1 || true
   sleep 15
   if "$SCRIPT_DIR/tests/test-stage.sh"; then
     log "Stage réparé sans reconstruction"

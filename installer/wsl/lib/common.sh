@@ -260,7 +260,8 @@ source_fingerprint() {
 
 api_image_exists() {
   docker image inspect ormt/ormt-core-api:latest >/dev/null 2>&1 &&
-    docker image inspect ormt/ormt-content-api:latest >/dev/null 2>&1
+    docker image inspect ormt/ormt-content-api:latest >/dev/null 2>&1 &&
+    docker image inspect ormt/ormt-pdf-renderer:latest >/dev/null 2>&1
 }
 
 web_image_exists() {

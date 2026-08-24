@@ -52,7 +52,7 @@ if test "$SCOPE" = "auto"; then
   if has_state stage-validated; then
     stage_detected=true
   else
-    for container in ormt-web-stage ormt-core-api ormt-content-api; do
+    for container in ormt-web-stage ormt-core-api ormt-content-api ormt-pdf-renderer; do
       if docker container inspect "$container" >/dev/null 2>&1; then
         stage_detected=true
         break

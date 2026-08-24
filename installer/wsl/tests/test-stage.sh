@@ -10,6 +10,19 @@ require_docker_ready
 need_cmd curl
 failures=0
 
+check_container_health() {
+  local label="$1"
+  local container="$2"
+  local health
+  health="$(docker inspect --format '{{.State.Health.Status}}' "$container" 2>/dev/null || true)"
+  if test "$health" = "healthy"; then
+    printf '  [OK] %-28s %s\n' "$label" "$health"
+  else
+    printf '  [KO] %-28s %s\n' "$label" "${health:-absent}" >&2
+    failures=$((failures + 1))
+  fi
+}
+
 check_http() {
   local label="$1"
   local expected="$2"
@@ -28,6 +41,8 @@ log "État des conteneurs Stage"
 docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
 
 log "Tests HTTP Stage"
+check_container_health "Renderer PDF" ormt-pdf-renderer
+check_http "Renderer PDF publié" '200' http://127.0.0.1:3010/health
 check_http "Traefik" '200|301|302|404' --header "Host: proxy.ormt.localhost" http://127.0.0.1/
 check_http "Frontend" '200|301|302' --header "Host: ormt.localhost" http://127.0.0.1/
 check_http "API Swagger" '200' --header "Host: ormt-core-api.localhost" http://127.0.0.1/v3/api-docs

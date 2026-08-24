@@ -90,8 +90,8 @@ else
   cp "$core_jar" "$runtime_context_root/core/app.jar"
   cp "${content_jars[0]}" "$runtime_context_root/content/app.jar"
 
-  set_progress "API Core + Content — création parallèle des images Docker d'exécution"
-  log "Création parallèle des images d'exécution API"
+  set_progress "API Core + Content + Renderer PDF — création parallèle des images Docker"
+  log "Création parallèle des images d'exécution API et du renderer PDF"
   docker build \
     --file "$WSL_ROOT/templates/ormt-core-api.runtime.Dockerfile" \
     --tag ormt/ormt-core-api:latest \
@@ -102,24 +102,34 @@ else
     --tag ormt/ormt-content-api:latest \
     "$runtime_context_root/content" &
   content_image_pid=$!
+  docker build \
+    --file "$ORMT_API_DIR/ormt-pdf-renderer/Dockerfile" \
+    --tag ormt/ormt-pdf-renderer:latest \
+    "$ORMT_API_DIR" &
+  renderer_image_pid=$!
 
   core_image_status=0
   content_image_status=0
+  renderer_image_status=0
   wait "$core_image_pid" || core_image_status=$?
   wait "$content_image_pid" || content_image_status=$?
-  if test "$core_image_status" -ne 0 || test "$content_image_status" -ne 0; then
-    die "Échec de création des images Docker (Core=$core_image_status, Content=$content_image_status)"
+  wait "$renderer_image_pid" || renderer_image_status=$?
+  if test "$core_image_status" -ne 0 ||
+    test "$content_image_status" -ne 0 ||
+    test "$renderer_image_status" -ne 0; then
+    die "Échec de création des images Docker (Core=$core_image_status, Content=$content_image_status, Renderer=$renderer_image_status)"
   fi
   rm -rf "$runtime_context_root"
   trap - EXIT
   mark_build api "$api_fingerprint"
 fi
 
-set_progress "API Core + Content — création et démarrage des conteneurs"
-log "Démarrage des APIs"
+set_progress "API Core + Content + Renderer PDF — création et démarrage des conteneurs"
+log "Démarrage des API et du renderer PDF"
 (cd "$ORMT_API_DIR" &&
   docker compose "${api_args[@]}" up -d --force-recreate --remove-orphans)
 
+wait_for_container_health ormt-pdf-renderer 60
 wait_for_host_route "API Core" "ormt-core-api.localhost" "/v3/api-docs" 90
 wait_for_host_route "Keycloak (realm ORMT configuré par Core API)" "users.ormt.localhost" "/realms/ormt" 90
 wait_for_host_route "API Content" "ormt-content-api.localhost" "/api/v1/public/partenaires" 90
