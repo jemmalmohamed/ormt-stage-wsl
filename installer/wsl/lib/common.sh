@@ -128,8 +128,7 @@ require_docker_ready() {
     die "Docker ne répond pas dans WSL."
 }
 
-require_project_dirs() {
-  test -d "$ORMT_INFRA_DIR" || die "Dossier infrastructure absent: $ORMT_INFRA_DIR"
+require_stage_project_dirs() {
   test -d "$ORMT_API_DIR" || die "Dossier API absent: $ORMT_API_DIR"
   test -d "$ORMT_WEB_DIR" || die "Dossier frontend absent: $ORMT_WEB_DIR"
 }

@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../lib/common.sh"
 
 require_linux
-require_project_dirs
+require_stage_project_dirs
 require_docker_ready
 
 log "Arrêt du frontend"
@@ -33,4 +33,3 @@ done
 
 clear_state stage-validated
 printf '\nStage arrêté sans suppression des volumes.\n'
-

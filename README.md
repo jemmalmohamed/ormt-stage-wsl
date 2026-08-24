@@ -139,6 +139,11 @@ l'opération sans modifier le dépôt. Les fichiers ignorés par Git, les volume
 Docker et les données métier sont conservés. Aucun clonage ou copie automatique
 n'est effectué dans le dossier Windows monté sous `/mnt/`.
 
+Le mode `Stage` synchronise uniquement l'API et le frontend. Lorsque le socle
+Docker et Traefik est déjà actif et validé, les commandes de démarrage, d'arrêt
+et de réinitialisation du Stage ne nécessitent pas la présence du dépôt
+`ormt-infra-stage-local-vps` dans `~/ormt-app/`.
+
 Après avoir choisi une provenance `Git` ou `Auto` dans le menu, l'installateur
 propose d'afficher les branches distantes. Si cette option est activée, chaque
 dépôt requis ayant plusieurs branches présente une liste numérotée. La branche
@@ -250,7 +255,9 @@ cd ~/ormt-app/ormt-stage-wsl
 
 `reset-stage.sh` est destructif et demande de saisir `RESET` lorsqu'il est lancé
 directement. Le mode `Stage` l'appelle seulement après validation du socle
-minimal et confirmation explicite avec `REINSTALLER`.
+minimal et confirmation explicite avec `REINSTALLER`. Cette réinitialisation
+utilise uniquement les sources API et frontend ; elle conserve l'infrastructure
+partagée même si son dépôt source n'est plus présent dans WSL.
 
 ## Maintenance globale locale
 

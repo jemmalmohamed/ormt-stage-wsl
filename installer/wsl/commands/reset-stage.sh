@@ -8,7 +8,7 @@ source "$SCRIPT_DIR/../lib/common.sh"
 source "$SCRIPT_DIR/../lib/docker.sh"
 
 require_linux
-require_project_dirs
+require_stage_project_dirs
 ensure_docker_service
 require_docker_ready
 
