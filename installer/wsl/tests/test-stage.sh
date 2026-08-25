@@ -42,7 +42,6 @@ docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
 
 log "Tests HTTP Stage"
 check_container_health "Renderer PDF" ormt-pdf-renderer
-check_http "Renderer PDF publié" '200' http://127.0.0.1:3010/health
 check_http "Traefik" '200|301|302|404' --header "Host: proxy.ormt.localhost" http://127.0.0.1/
 check_http "Frontend" '200|301|302' --header "Host: ormt.localhost" http://127.0.0.1/
 check_http "API Swagger" '200' --header "Host: ormt-core-api.localhost" http://127.0.0.1/v3/api-docs

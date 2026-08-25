@@ -206,11 +206,11 @@ Les images PostgreSQL, Keycloak, MinIO et Nextcloud sont également préchargée
 en parallèle. Les deux API sont compilées simultanément avec le cache Maven
 persistant de WSL. Leurs images d'exécution et celle du renderer PDF sont
 ensuite assemblées en parallèle. Le contrôle final exige que le renderer PDF
-soit déclaré `healthy` et que son endpoint local
-`http://localhost:3010/health` réponde avant de valider le Stage. Ce port est
-publié uniquement pour le diagnostic local ; le Core API conteneurisé continue
-d'appeler le renderer par son nom de service interne
-`http://ormt-pdf-renderer:3010`.
+soit déclaré `healthy` avant de valider le Stage. Comme en production, aucun
+port hôte n'est publié pour ce service : le Core API conteneurisé appelle le
+renderer par son nom de service interne `http://ormt-pdf-renderer:3010`. Le
+profil Docker de développement conserve séparément `localhost:3010` pour le
+backend exécuté directement sur la machine de développement.
 
 L'état persistant est conservé dans :
 
