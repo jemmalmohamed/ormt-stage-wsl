@@ -5,6 +5,9 @@
   [ValidateSet("Auto", "Provided", "Git")]
   [string]$SourceMode = "Auto",
 
+  [ValidateSet("Deploy", "Initialize", "Reinitialize")]
+  [string]$StageAction = "Deploy",
+
   [string]$ProvidedSourcesDir = "",
   [string]$Distro = "Ubuntu-24.04",
 
@@ -28,7 +31,7 @@ $LogDir = Join-Path $PackageRoot "logs"
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 $LogFile = Join-Path $LogDir ("setup-{0}.log" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
 $StartedAt = Get-Date
-$ReinstallStage = ($Mode -eq "Stage")
+$ReinstallStage = ($StageAction -eq "Reinitialize")
 $LocalDomainsScript = Join-Path $PSScriptRoot "configure-local-domains.ps1"
 
 if ([string]::IsNullOrWhiteSpace($ProvidedSourcesDir)) {
@@ -128,6 +131,7 @@ function Invoke-WslInstaller {
     bash ./installer/wsl/setup.sh `
       --mode $Mode `
       --source-mode $SourceMode `
+      --stage-action $StageAction `
       --log-file $WslLogFile `
       --provided-sources-dir $WslProvidedSources `
       @branchSelectionArgs `
@@ -344,6 +348,9 @@ $WslProvidedSources = Convert-ToWslPath -WindowsPath $ProvidedSourcesDir
 
 Write-Step "Installation ORMT - mode $Mode - sources $SourceMode"
 Write-Host "Journal: $LogFile"
+if ($Mode -in @("Full", "Stage")) {
+  Write-Host "Action Stage: $StageAction"
+}
 if ($SelectGitBranches) {
   Write-Host "Branches Git: sélection interactive si plusieurs branches sont disponibles"
 }

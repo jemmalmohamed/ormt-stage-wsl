@@ -274,18 +274,17 @@ accessible dans `Ubuntu-24.04`.
 
 ### Installation, mise à jour et realm Keycloak
 
-Le même BAT sert à la première installation et aux mises à jour. Après le
-démarrage de PostgreSQL et Keycloak, l'installateur choisit automatiquement
-l'action sûre :
+Le BAT demande explicitement l'action à effectuer :
 
-- base métier vide : import initial des données et création du realm `ormt` ;
-- base et realm présents : déploiement normal, sans import ni suppression ;
-- installation déjà validée mais realm `ormt` absent : réparation de Keycloak
-  uniquement, sans réimporter les données métier ;
-- installation interrompue avant sa validation : reprise non destructive de
-  l'initialisation.
+- **DEPLOYER** : met à jour le code et redémarre avec `ORMT_ACTION=DEPLOYER`,
+  sans importer ni supprimer les données ;
+- **INITIALISER** : utilise temporairement
+  `ORMT_ACTION=DEPLOYER_INITIALISER_DATA` pour créer notamment le realm `ormt`
+  et importer `init-data`, sans vider préalablement les bases ;
+- **RÉINITIALISER** : demande la confirmation `REINSTALLER`, supprime les
+  volumes du Stage métier, puis effectue une initialisation complète.
 
-Après une initialisation ou une réparation réussie, les API sont recréées avec
+Après une initialisation réussie, les API sont recréées avec
 `ORMT_ACTION=DEPLOYER`. La valeur permanente du Stage reste donc
 `DEPLOYER`. Une suppression complète des données n'est possible que par le
 menu de réinitialisation et sa confirmation explicite.

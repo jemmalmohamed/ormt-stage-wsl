@@ -13,6 +13,19 @@ require_docker_ready
 need_cmd curl
 verify_proxy
 
+stage_action="${ORMT_STAGE_ACTION:-deploy}"
+case "$stage_action" in
+  deploy)
+    api_action="DEPLOYER"
+    ;;
+  initialize|reinitialize)
+    api_action="DEPLOYER_INITIALISER_DATA"
+    ;;
+  *)
+    die "Action Stage invalide: $stage_action (deploy, initialize ou reinitialize attendu)"
+    ;;
+esac
+
 mapfile -t api_args < <(api_service_compose_args)
 (cd "$ORMT_API_DIR" && docker compose "${api_args[@]}" config --quiet)
 
@@ -45,39 +58,7 @@ wait_for_container_health ormt-database 60
 wait_for_container_health minio-ormt 60
 wait_for_host_route "Keycloak (realm master)" "users.ormt.localhost" "/realms/master" 90
 wait_for_host_route "Nextcloud" "nextcloud.ormt.localhost" "/status.php" 90
-
-realm_code="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-  --header "Host: users.ormt.localhost" "http://127.0.0.1/realms/ormt" 2>/dev/null || true)"
-[[ "$realm_code" =~ ^(200|404)$ ]] ||
-  die "Impossible de déterminer l'état du realm ORMT (réponse HTTP: ${realm_code:-000})."
-
-db_user="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' ormt-database |
-  awk -F= '$1 == "POSTGRES_USER" {print substr($0, index($0, "=") + 1); exit}')"
-db_name="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' ormt-database |
-  awk -F= '$1 == "POSTGRES_DB" {print substr($0, index($0, "=") + 1); exit}')"
-test -n "$db_user" && test -n "$db_name" || die "Configuration PostgreSQL Stage illisible."
-
-database_initialized="$(docker exec ormt-database psql -U "$db_user" -d "$db_name" -tAc \
-  "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema IN ('core','content'));" \
-  2>/dev/null | tr -d '[:space:]')"
-
-api_action="DEPLOYER"
-seed_keycloak_users="false"
-if test "$database_initialized" != "t"; then
-  api_action="DEPLOYER_INITIALISER_DATA"
-  seed_keycloak_users="true"
-  log "Première installation détectée: base métier vide; initialisation des données et de Keycloak"
-elif test "$realm_code" = "404" && has_state stage-bootstrap-complete; then
-  api_action="DEPLOYER_INITIALISER_SYSTEME"
-  seed_keycloak_users="true"
-  log "Realm ORMT absent avec une base existante: réparation de Keycloak sans import des données métier"
-elif test "$realm_code" = "404"; then
-  api_action="DEPLOYER_INITIALISER_DATA"
-  seed_keycloak_users="true"
-  log "Installation Stage incomplète détectée: reprise non destructive de l'initialisation"
-else
-  log "Stage existant détecté: déploiement sans import ni suppression de données"
-fi
+log "Action Stage demandée: $stage_action (ORMT_ACTION=$api_action)"
 
 api_fingerprint="$(source_fingerprint "$ORMT_API_DIR")"
 if build_is_current api "$api_fingerprint" && api_image_exists; then
@@ -160,8 +141,7 @@ fi
 set_progress "API Core + Content + Renderer PDF — création et démarrage des conteneurs"
 log "Démarrage des API et du renderer PDF"
 (cd "$ORMT_API_DIR" &&
-  ORMT_ACTION="$api_action" STARTER_KEYCLOAK_SEED_USERS="$seed_keycloak_users" \
-    docker compose "${api_args[@]}" up -d --force-recreate --remove-orphans)
+  ORMT_ACTION="$api_action" docker compose "${api_args[@]}" up -d --force-recreate --remove-orphans)
 
 wait_for_container_health ormt-pdf-renderer 60
 wait_for_host_route "API Core" "ormt-core-api.localhost" "/v3/api-docs" 90
@@ -169,16 +149,14 @@ wait_for_host_route "Keycloak (realm ORMT configuré par Core API)" "users.ormt.
 wait_for_host_route "API Content" "ormt-content-api.localhost" "/api/v1/public/partenaires" 90
 wait_for_host_route "API Content Publications" "ormt-content-api.localhost" "/api/v1/public/publications?pageSize=1" 90
 
-if test "$api_action" != "DEPLOYER"; then
+if test "$stage_action" != "deploy"; then
   set_progress "API Core + Content — passage au mode de déploiement normal"
   log "Initialisation terminée: redémarrage définitif des API avec ORMT_ACTION=DEPLOYER"
   (cd "$ORMT_API_DIR" &&
-    ORMT_ACTION=DEPLOYER STARTER_KEYCLOAK_SEED_USERS=false \
-      docker compose "${api_args[@]}" up -d --force-recreate ormt-core-api ormt-content-api)
+    ORMT_ACTION=DEPLOYER docker compose "${api_args[@]}" up -d --force-recreate ormt-core-api ormt-content-api)
   wait_for_host_route "API Core après initialisation" "ormt-core-api.localhost" "/v3/api-docs" 90
   wait_for_host_route "API Content après initialisation" "ormt-content-api.localhost" "/api/v1/public/partenaires" 90
 fi
-mark_state stage-bootstrap-complete
 
 web_fingerprint="$(source_fingerprint "$ORMT_WEB_DIR")"
 if build_is_current web "$web_fingerprint" && web_image_exists; then

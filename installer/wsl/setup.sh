@@ -8,6 +8,7 @@ PACKAGE_ROOT=""
 PROVIDED_ROOT=""
 RESET_STAGE=false
 SELECT_GIT_BRANCHES=false
+STAGE_ACTION="deploy"
 
 while test "$#" -gt 0; do
   case "$1" in
@@ -33,7 +34,12 @@ while test "$#" -gt 0; do
       ;;
     --reset-stage)
       RESET_STAGE=true
+      STAGE_ACTION="reinitialize"
       shift
+      ;;
+    --stage-action)
+      STAGE_ACTION="${2:?Valeur --stage-action manquante}"
+      shift 2
       ;;
     --select-git-branches)
       SELECT_GIT_BRANCHES=true
@@ -48,6 +54,7 @@ done
 
 MODE="${MODE,,}"
 SOURCE_MODE="${SOURCE_MODE,,}"
+STAGE_ACTION="${STAGE_ACTION,,}"
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 CURRENT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -68,6 +75,18 @@ case "$SOURCE_MODE" in
     exit 2
     ;;
 esac
+
+case "$STAGE_ACTION" in
+  deploy|initialize|reinitialize) ;;
+  *)
+    printf 'ERREUR: action Stage invalide: %s\n' "$STAGE_ACTION" >&2
+    exit 2
+    ;;
+esac
+
+if test "$STAGE_ACTION" = "reinitialize"; then
+  RESET_STAGE=true
+fi
 
 if [[ "$CURRENT_ROOT" == /mnt/* ]]; then
   PACKAGE_ROOT="${PACKAGE_ROOT:-$CURRENT_ROOT}"
@@ -104,6 +123,7 @@ if [[ "$CURRENT_ROOT" == /mnt/* ]]; then
     --log-file "$LOG_FILE" \
     --package-root "$PACKAGE_ROOT" \
     --provided-sources-dir "$PROVIDED_ROOT" \
+    --stage-action "$STAGE_ACTION" \
     "${branch_selection_args[@]}" \
     "${reset_stage_args[@]}"
 fi
@@ -305,7 +325,7 @@ repair_installation() {
 }
 
 started_at=$SECONDS
-log "Mode: $MODE | Sources demandées: $SOURCE_MODE"
+log "Mode: $MODE | Sources demandées: $SOURCE_MODE | Action Stage: $STAGE_ACTION"
 
 case "$MODE" in
   diagnostic)
@@ -327,6 +347,7 @@ case "$MODE" in
     prepare_environment
     sync_sources
     ensure_infrastructure true
+    reset_stage_before_install
     install_stage
     ;;
   repair)

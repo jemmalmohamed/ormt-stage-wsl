@@ -5,6 +5,7 @@ title Installation ORMT Stage
 
 :MENU
 cls
+set "STAGE_ACTION="
 echo ============================================================
 echo              INSTALLATION ORMT STAGE
 echo ============================================================
@@ -46,7 +47,7 @@ goto RUN
 
 :MODE_STAGE
 set "INSTALL_MODE=Stage"
-goto SOURCE_MENU
+goto STAGE_ACTION_MENU
 
 :MODE_INFRASTRUCTURE
 set "INSTALL_MODE=Infrastructure"
@@ -54,6 +55,26 @@ goto SOURCE_MENU
 
 :MODE_FULL
 set "INSTALL_MODE=Full"
+goto STAGE_ACTION_MENU
+
+:STAGE_ACTION_MENU
+cls
+echo ============================================================
+echo              ACTION STAGE METIER
+echo ============================================================
+echo.
+echo  1. DEPLOYER       - Mettre a jour sans importer les donnees
+echo  2. INITIALISER    - Importer init-data sans supprimer les donnees
+echo  3. REINITIALISER  - Supprimer les donnees puis tout initialiser
+echo  0. Retour
+echo.
+set "ACTION_CHOICE="
+set /p "ACTION_CHOICE=Votre choix puis Entree: "
+if "%ACTION_CHOICE%"=="0" goto MENU
+if "%ACTION_CHOICE%"=="1" set "STAGE_ACTION=Deploy"
+if "%ACTION_CHOICE%"=="2" set "STAGE_ACTION=Initialize"
+if "%ACTION_CHOICE%"=="3" set "STAGE_ACTION=Reinitialize"
+if not defined STAGE_ACTION goto STAGE_ACTION_MENU
 goto SOURCE_MENU
 
 :SOURCE_MENU
@@ -107,6 +128,7 @@ set "SELECT_GIT_BRANCHES=false"
 :RUN
 cls
 echo Mode       : %INSTALL_MODE%
+if defined STAGE_ACTION echo Action     : %STAGE_ACTION%
 echo Sources    : %SOURCE_MODE%
 if "%SELECT_GIT_BRANCHES%"=="true" echo Branches   : selection interactive
 if not "%SOURCE_MODE%"=="Git" if defined PROVIDED_DIR echo Dossier     : %PROVIDED_DIR%
@@ -117,7 +139,9 @@ if /I not "%CONTINUE_CHOICE%"=="O" goto MENU
 
 set "BRANCH_SELECTION_ARG="
 if "%SELECT_GIT_BRANCHES%"=="true" set "BRANCH_SELECTION_ARG=-SelectGitBranches"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer\windows\setup.ps1" -Mode "%INSTALL_MODE%" -SourceMode "%SOURCE_MODE%" -ProvidedSourcesDir "%PROVIDED_DIR%" %BRANCH_SELECTION_ARG%
+set "STAGE_ACTION_ARG="
+if defined STAGE_ACTION set "STAGE_ACTION_ARG=-StageAction %STAGE_ACTION%"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer\windows\setup.ps1" -Mode "%INSTALL_MODE%" -SourceMode "%SOURCE_MODE%" -ProvidedSourcesDir "%PROVIDED_DIR%" %STAGE_ACTION_ARG% %BRANCH_SELECTION_ARG%
 set "INSTALL_EXIT=%ERRORLEVEL%"
 echo.
 if "%INSTALL_EXIT%"=="0" (
