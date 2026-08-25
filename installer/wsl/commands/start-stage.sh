@@ -26,6 +26,51 @@ case "$stage_action" in
     ;;
 esac
 
+wait_for_application_ready_log() {
+  local name="$1"
+  local container="$2"
+  local success_marker="$3"
+  local attempts="${4:-900}"
+  local total_attempts="$attempts"
+  local status="unknown"
+
+  log "Attente de la fin réelle: $name"
+  while true; do
+    if docker logs "$container" 2>&1 | grep --fixed-strings --quiet "$success_marker"; then
+      clear_progress
+      log "OK: $name terminé"
+      return 0
+    fi
+
+    status="$(docker inspect --format '{{.State.Status}}' "$container" 2>/dev/null || true)"
+    if [[ "$status" =~ ^(exited|dead|restarting)$ ]]; then
+      docker logs --tail 200 "$container" 2>/dev/null || true
+      die "$name a échoué (conteneur $container: ${status:-absent})"
+    fi
+
+    attempts=$((attempts - 1))
+    if test "$attempts" -le 0; then
+      docker logs --tail 200 "$container" 2>/dev/null || true
+      die "$name n'est pas terminé après $((total_attempts * 2)) secondes"
+    fi
+    set_progress "$name — import en cours — tentative $((total_attempts - attempts))/$total_attempts"
+    sleep 2
+  done
+}
+
+validate_core_initial_data() {
+  local stats=""
+  stats="$(curl --silent --show-error --fail \
+    --header "Host: ormt-core-api.localhost" \
+    "http://127.0.0.1/api/v1/public/dashboard/stats" 2>/dev/null || true)"
+  if ! grep --extended-regexp --quiet '"domaines":[1-9][0-9]*' <<< "$stats" ||
+    ! grep --extended-regexp --quiet '"indicateurs":[1-9][0-9]*' <<< "$stats"; then
+    docker logs --tail 200 ormt-core-api 2>/dev/null || true
+    die "Initialisation Core incomplète: domaines ou indicateurs absents après l'import init-data"
+  fi
+  log "OK: données initiales Core présentes"
+}
+
 mapfile -t api_args < <(api_service_compose_args)
 (cd "$ORMT_API_DIR" && docker compose "${api_args[@]}" config --quiet)
 
@@ -144,12 +189,19 @@ log "Démarrage des API et du renderer PDF"
   ORMT_ACTION="$api_action" docker compose "${api_args[@]}" up -d --force-recreate --remove-orphans)
 
 wait_for_container_health ormt-pdf-renderer 60
+if test "$stage_action" != "deploy"; then
+  wait_for_application_ready_log "Initialisation API Core" ormt-core-api \
+    "========== [CORE][DÉMARRAGE] FIN - SUCCÈS" 900
+  wait_for_application_ready_log "Initialisation API Content" ormt-content-api \
+    "========== [CONTENT][DÉMARRAGE] FIN - SUCCÈS" 300
+fi
 wait_for_host_route "API Core" "ormt-core-api.localhost" "/v3/api-docs" 90
 wait_for_host_route "Keycloak (realm ORMT configuré par Core API)" "users.ormt.localhost" "/realms/ormt" 90
 wait_for_host_route "API Content" "ormt-content-api.localhost" "/api/v1/public/partenaires" 90
 wait_for_host_route "API Content Publications" "ormt-content-api.localhost" "/api/v1/public/publications?pageSize=1" 90
 
 if test "$stage_action" != "deploy"; then
+  validate_core_initial_data
   set_progress "API Core + Content — passage au mode de déploiement normal"
   log "Initialisation terminée: redémarrage définitif des API avec ORMT_ACTION=DEPLOYER"
   (cd "$ORMT_API_DIR" &&
