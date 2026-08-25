@@ -18,8 +18,11 @@ case "$stage_action" in
   deploy)
     api_action="DEPLOYER"
     ;;
-  initialize|reinitialize)
+  initialize)
     api_action="DEPLOYER_INITIALISER_DATA"
+    ;;
+  reinitialize)
+    api_action="REINITIALISER_COMPLETEMENT"
     ;;
   *)
     die "Action Stage invalide: $stage_action (deploy, initialize ou reinitialize attendu)"
