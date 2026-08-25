@@ -17,12 +17,15 @@ stage_action="${ORMT_STAGE_ACTION:-deploy}"
 case "$stage_action" in
   deploy)
     api_action="DEPLOYER"
+    api_restart_policy="always"
     ;;
   initialize)
     api_action="DEPLOYER_INITIALISER_DATA"
+    api_restart_policy="no"
     ;;
   reinitialize)
     api_action="REINITIALISER_COMPLETEMENT"
+    api_restart_policy="no"
     ;;
   *)
     die "Action Stage invalide: $stage_action (deploy, initialize ou reinitialize attendu)"
@@ -189,7 +192,8 @@ fi
 set_progress "API Core + Content + Renderer PDF — création et démarrage des conteneurs"
 log "Démarrage des API et du renderer PDF"
 (cd "$ORMT_API_DIR" &&
-  ORMT_ACTION="$api_action" docker compose "${api_args[@]}" up -d --force-recreate --remove-orphans)
+  ORMT_ACTION="$api_action" API_RESTART_POLICY="$api_restart_policy" \
+    docker compose "${api_args[@]}" up -d --force-recreate --remove-orphans)
 
 wait_for_container_health ormt-pdf-renderer 60
 if test "$stage_action" != "deploy"; then
@@ -208,7 +212,8 @@ if test "$stage_action" != "deploy"; then
   set_progress "API Core + Content — passage au mode de déploiement normal"
   log "Initialisation terminée: redémarrage définitif des API avec ORMT_ACTION=DEPLOYER"
   (cd "$ORMT_API_DIR" &&
-    ORMT_ACTION=DEPLOYER docker compose "${api_args[@]}" up -d --force-recreate ormt-core-api ormt-content-api)
+    ORMT_ACTION=DEPLOYER API_RESTART_POLICY=always \
+      docker compose "${api_args[@]}" up -d --force-recreate ormt-core-api ormt-content-api)
   wait_for_host_route "API Core après initialisation" "ormt-core-api.localhost" "/v3/api-docs" 90
   wait_for_host_route "API Content après initialisation" "ormt-content-api.localhost" "/api/v1/public/partenaires" 90
 fi
