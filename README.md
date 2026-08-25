@@ -40,8 +40,9 @@ deux API. L'image du renderer PDF est construite depuis
 `ormt-api/ormt-pdf-renderer` avec l'image officielle Playwright.
 
 Après le démarrage de MinIO, l'installateur provisionne les buckets `ormt` et
-`ormt-content` avec le compte local existant. Les API vérifient ensuite
-l'existence de leur bucket sans administrer MinIO.
+`ormt-content`, puis attache au compte applicatif `ormt` une politique limitée
+aux opérations objet nécessaires. Le compte administrateur local reste réservé
+au provisionnement ; les API ne le reçoivent pas et n'administrent pas MinIO.
 
 Le Stage active également l'injection des utilisateurs Keycloak de test via une
 surcharge Compose locale à l'installateur. Le profil et le déploiement de
@@ -182,13 +183,15 @@ Valeurs principales :
 ORMT_SOURCE_MODE=auto
 ORMT_SELECT_GIT_BRANCHES=false
 ORMT_INSTALL_DEV_TOOLS=true
-ORMT_SKIP_TESTS=false
-ORMT_DOCKER_PULL_PARALLEL=4
 ```
 
-Lors d'une première installation, les images de l'infrastructure sont
-téléchargées avec une progression visible et jusqu'à quatre téléchargements
-simultanés. Les relances réutilisent les images déjà présentes.
+Le Stage compile les API sans exécuter ni compiler leurs tests : les tests Java
+appartiennent au contrôle CI, tandis que l'installateur vérifie le système
+réellement déployé. Cette règle n'est pas une option de déploiement.
+
+Lors d'une première installation, Docker Compose et Ansible téléchargent les
+images réellement nécessaires. Les relances réutilisent les images déjà
+présentes dans le cache Docker.
 
 Pendant les opérations longues, la sortie native des commandes APT, Ansible,
 Docker, Maven et npm est affichée directement dans le terminal. Aucun bloc
@@ -209,12 +212,16 @@ configuration du dépôt ou de l'installateur.
 Les images PostgreSQL, Keycloak, MinIO et Nextcloud sont également préchargées
 en parallèle. Les images officielles des deux API et celle du renderer PDF sont
 construites en parallèle. Chaque Dockerfile API gère lui-même sa compilation
-Maven et son cache, exactement comme lors d'une construction de production. Le contrôle final exige que le renderer PDF
-soit déclaré `healthy` avant de valider le Stage. Comme en production, aucun
-port hôte n'est publié pour ce service : le Core API conteneurisé appelle le
-renderer par son nom de service interne `http://ormt-pdf-renderer:3010`. Le
-profil Docker de développement conserve séparément `localhost:3010` pour le
-backend exécuté directement sur la machine de développement.
+Maven avec un cache BuildKit commun. Ce cache est volontairement isolé du
+`~/.m2` de WSL : le premier build télécharge uniquement les dépendances utiles,
+puis les reconstructions les réutilisent. L'ancien préchargement exhaustif
+`dependency:go-offline` n'est plus exécuté. Le contrôle final exige que le
+renderer PDF soit déclaré `healthy` avant de valider le Stage. Comme en
+production, aucun port hôte n'est publié pour ce service : le Core API
+conteneurisé appelle le renderer par son nom de service interne
+`http://ormt-pdf-renderer:3010`. Le profil Docker de développement conserve
+séparément `localhost:3010` pour le backend exécuté directement sur la machine
+de développement.
 
 L'état persistant est conservé dans :
 

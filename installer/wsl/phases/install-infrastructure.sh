@@ -36,11 +36,8 @@ clear_progress
 (cd "$ORMT_INFRA_DIR/ansible" &&
   ansible-playbook -v "${base_ansible_args[@]}")
 
-set_progress "Docker — vérification du service puis téléchargement des images d'infrastructure"
+set_progress "Docker — vérification du service"
 ensure_docker_service
-prefetch_docker_images \
-  "$ORMT_INFRA_DIR/ansible/roles/docker-containers/containers" \
-  "${ORMT_DOCKER_PULL_PARALLEL:-4}"
 
 log "Configuration et démarrage des conteneurs avec Ansible"
 set_progress "Ansible conteneurs — préparation de Traefik et des outils d'infrastructure"

@@ -4,8 +4,6 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/../lib/common.sh"
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/../lib/docker.sh"
 
 require_linux
 require_stage_project_dirs
@@ -80,12 +78,6 @@ validate_core_initial_data() {
 mapfile -t api_args < <(api_service_compose_args)
 (cd "$ORMT_API_DIR" && docker compose "${api_args[@]}" config --quiet)
 
-set_progress "Services métier — téléchargement parallèle des images Docker"
-log "Préchargement parallèle des images des services métier"
-prefetch_docker_images \
-  "$ORMT_API_DIR/docker/services" \
-  "${ORMT_DOCKER_PULL_PARALLEL:-4}"
-
 set_progress "Services métier — démarrage PostgreSQL, Keycloak, MinIO et Nextcloud"
 log "Démarrage PostgreSQL, Keycloak, MinIO et Nextcloud"
 compose_up "$ORMT_API_DIR" \
@@ -98,6 +90,7 @@ compose_up "$ORMT_API_DIR" \
   -f ./docker/services/keycloak/docker-compose.kc.stage.yml
 compose_up "$ORMT_API_DIR" \
   --env-file ./docker/services/minio/env/.env.stage \
+  --env-file ./docker/app/env/.env.stage \
   -f ./docker/services/minio/docker-compose.minio.base.yml \
   -f ./docker/services/minio/docker-compose.minio.stage.yml
 compose_up "$ORMT_API_DIR" \
@@ -128,21 +121,16 @@ api_fingerprint="$(source_fingerprint "$ORMT_API_DIR")"
 if build_is_current api "$api_fingerprint" && api_image_exists; then
   log "Images API inchangées: reconstruction ignorée"
 else
-  docker_build_args=()
-  if test "$ORMT_SKIP_TESTS" = "true"; then
-    docker_build_args+=(--build-arg SKIP_TESTS=true)
-  fi
-
   set_progress "API Core + Content + Renderer PDF — construction parallèle des images officielles"
   log "Construction parallèle avec les mêmes Dockerfiles qu'en production"
   docker build \
-    "${docker_build_args[@]}" \
+    --build-arg SKIP_TESTS=true \
     --file "$ORMT_API_DIR/ormt-core-api/Dockerfile" \
     --tag ormt/ormt-core-api:latest \
     "$ORMT_API_DIR" &
   core_image_pid=$!
   docker build \
-    "${docker_build_args[@]}" \
+    --build-arg SKIP_TESTS=true \
     --file "$ORMT_API_DIR/ormt-content-api/Dockerfile" \
     --tag ormt/ormt-content-api:latest \
     "$ORMT_API_DIR" &

@@ -37,6 +37,19 @@ check_http() {
   fi
 }
 
+check_container_env_absent() {
+  local label="$1"
+  local container="$2"
+  local prefix="$3"
+  if docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container" 2>/dev/null |
+    grep --quiet "^${prefix}"; then
+    printf '  [KO] %-28s variable interdite %s* présente\n' "$label" "$prefix" >&2
+    failures=$((failures + 1))
+  else
+    printf '  [OK] %-28s aucun secret %s*\n' "$label" "$prefix"
+  fi
+}
+
 log "État des conteneurs Stage"
 docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
 
@@ -53,6 +66,8 @@ check_http "Keycloak master" '200' --header "Host: users.ormt.localhost" http://
 check_http "MinIO" '200' --header "Host: minio.ormt.localhost" http://127.0.0.1/minio/health/live
 check_http "Keycloak ORMT" '200' http://127.0.0.1:8092/realms/ormt
 check_http "MinIO" '200' http://127.0.0.1:9000/minio/health/live
+check_container_env_absent "Core sans admin MinIO" ormt-core-api MINIO_ROOT_
+check_container_env_absent "Content sans admin MinIO" ormt-content-api MINIO_ROOT_
 
 if test "$failures" -ne 0; then
   docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' >&2 || true
