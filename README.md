@@ -43,6 +43,8 @@ Après le démarrage de MinIO, l'installateur provisionne les buckets `ormt` et
 `ormt-content`, puis attache au compte applicatif `ormt` une politique limitée
 aux opérations objet nécessaires. Le compte administrateur local reste réservé
 au provisionnement ; les API ne le reçoivent pas et n'administrent pas MinIO.
+Le provisionnement vérifie avec le compte applicatif l'écriture, la lecture puis
+la suppression d'un objet temporaire dans chacun des deux buckets.
 
 Le Stage active également l'injection des utilisateurs Keycloak de test via une
 surcharge Compose locale à l'installateur. Le profil et le déploiement de
