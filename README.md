@@ -33,11 +33,15 @@ le fichier `C:\Windows\System32\drivers\etc\hosts`. Accepte-la afin que les
 adresses Stage soient accessibles depuis le navigateur. L'installateur gère un
 bloc ORMT isolé et le retire lors de la suppression complète de la distribution.
 
-Les images d'exécution des API sont construites à partir de contextes temporaires
-contenant uniquement les JAR compilés. L'image du renderer PDF est construite
-depuis `ormt-api/ormt-pdf-renderer` avec l'image officielle Playwright. La
-construction du Stage ne dépend donc pas des règles `.dockerignore` des dépôts
-applicatifs, qui peuvent rester adaptées au processus de production.
+Les images Core API et Content API sont construites directement avec les
+Dockerfiles officiels du dépôt `ormt-api`, comme en production. Le dossier
+unique `ormt-api/data/init-data` appartient au même contexte Docker pour les
+deux API. L'image du renderer PDF est construite depuis
+`ormt-api/ormt-pdf-renderer` avec l'image officielle Playwright.
+
+Après le démarrage de MinIO, l'installateur provisionne les buckets `ormt` et
+`ormt-content` avec le compte local existant. Les API vérifient ensuite
+l'existence de leur bucket sans administrer MinIO.
 
 Le Stage active également l'injection des utilisateurs Keycloak de test via une
 surcharge Compose locale à l'installateur. Le profil et le déploiement de
@@ -203,9 +207,9 @@ afin d'éviter plusieurs saisies durant les clones ; il n'est pas écrit dans la
 configuration du dépôt ou de l'installateur.
 
 Les images PostgreSQL, Keycloak, MinIO et Nextcloud sont également préchargées
-en parallèle. Les deux API sont compilées simultanément avec le cache Maven
-persistant de WSL. Leurs images d'exécution et celle du renderer PDF sont
-ensuite assemblées en parallèle. Le contrôle final exige que le renderer PDF
+en parallèle. Les images officielles des deux API et celle du renderer PDF sont
+construites en parallèle. Chaque Dockerfile API gère lui-même sa compilation
+Maven et son cache, exactement comme lors d'une construction de production. Le contrôle final exige que le renderer PDF
 soit déclaré `healthy` avant de valider le Stage. Comme en production, aucun
 port hôte n'est publié pour ce service : le Core API conteneurisé appelle le
 renderer par son nom de service interne `http://ormt-pdf-renderer:3010`. Le

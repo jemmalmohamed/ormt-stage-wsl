@@ -107,6 +107,19 @@ compose_up "$ORMT_API_DIR" \
 
 wait_for_container_health ormt-database 60
 wait_for_container_health minio-ormt 60
+
+set_progress "MinIO — vérification du provisionnement"
+log "Vérification du provisionnement MinIO"
+if ! minio_bootstrap_status="$(timeout 120 docker wait ormt-minio-bootstrap)"; then
+  docker logs --tail 200 ormt-minio-bootstrap 2>/dev/null || true
+  die "Le provisionnement MinIO ne s'est pas terminé dans le délai attendu"
+fi
+if test "$minio_bootstrap_status" != "0"; then
+  docker logs --tail 200 ormt-minio-bootstrap 2>/dev/null || true
+  die "Le provisionnement MinIO a échoué (code $minio_bootstrap_status)"
+fi
+log "OK: buckets et compte applicatif MinIO provisionnés"
+
 wait_for_host_route "Keycloak (realm master)" "users.ormt.localhost" "/realms/master" 90
 wait_for_host_route "Nextcloud" "nextcloud.ormt.localhost" "/status.php" 90
 log "Action Stage demandée: $stage_action (ORMT_ACTION=$api_action)"
@@ -115,57 +128,24 @@ api_fingerprint="$(source_fingerprint "$ORMT_API_DIR")"
 if build_is_current api "$api_fingerprint" && api_image_exists; then
   log "Images API inchangées: reconstruction ignorée"
 else
-  maven_args=(-B package)
+  docker_build_args=()
   if test "$ORMT_SKIP_TESTS" = "true"; then
-    maven_args=(-B -DskipTests package)
+    docker_build_args+=(--build-arg SKIP_TESTS=true)
   fi
 
-  set_progress "API Core + Content — compilation Maven parallèle avec cache partagé"
-  log "Compilation parallèle des API Core et Content (cache Maven partagé)"
-  (
-    cd "$ORMT_API_DIR/ormt-core-api"
-    bash ./mvnw "${maven_args[@]}"
-  ) &
-  core_pid=$!
-  (
-    cd "$ORMT_API_DIR/ormt-content-api"
-    bash ./mvnw "${maven_args[@]}"
-  ) &
-  content_pid=$!
-
-  core_status=0
-  content_status=0
-  wait "$core_pid" || core_status=$?
-  wait "$content_pid" || content_status=$?
-  if test "$core_status" -ne 0 || test "$content_status" -ne 0; then
-    die "Échec de compilation Maven (Core=$core_status, Content=$content_status)"
-  fi
-
-  core_jar="$ORMT_API_DIR/ormt-core-api/target/ormt-core-api.jar"
-  mapfile -t content_jars < <(find "$ORMT_API_DIR/ormt-content-api/target" -maxdepth 1 \
-    -type f -name 'ormt-content-api-*.jar' -print)
-  test -s "$core_jar" || die "JAR Core absent après compilation: $core_jar"
-  test "${#content_jars[@]}" -eq 1 ||
-    die "Un seul JAR Content était attendu, trouvé: ${#content_jars[@]}"
-  test -s "${content_jars[0]}" || die "JAR Content vide: ${content_jars[0]}"
-
-  runtime_context_root="$(mktemp -d)"
-  trap 'rm -rf "$runtime_context_root"' EXIT
-  mkdir -p "$runtime_context_root/core" "$runtime_context_root/content"
-  cp "$core_jar" "$runtime_context_root/core/app.jar"
-  cp "${content_jars[0]}" "$runtime_context_root/content/app.jar"
-
-  set_progress "API Core + Content + Renderer PDF — création parallèle des images Docker"
-  log "Création parallèle des images d'exécution API et du renderer PDF"
+  set_progress "API Core + Content + Renderer PDF — construction parallèle des images officielles"
+  log "Construction parallèle avec les mêmes Dockerfiles qu'en production"
   docker build \
-    --file "$WSL_ROOT/templates/ormt-core-api.runtime.Dockerfile" \
+    "${docker_build_args[@]}" \
+    --file "$ORMT_API_DIR/ormt-core-api/Dockerfile" \
     --tag ormt/ormt-core-api:latest \
-    "$runtime_context_root/core" &
+    "$ORMT_API_DIR" &
   core_image_pid=$!
   docker build \
-    --file "$WSL_ROOT/templates/ormt-content-api.runtime.Dockerfile" \
+    "${docker_build_args[@]}" \
+    --file "$ORMT_API_DIR/ormt-content-api/Dockerfile" \
     --tag ormt/ormt-content-api:latest \
-    "$runtime_context_root/content" &
+    "$ORMT_API_DIR" &
   content_image_pid=$!
   docker build \
     --file "$ORMT_API_DIR/ormt-pdf-renderer/Dockerfile" \
@@ -184,8 +164,6 @@ else
     test "$renderer_image_status" -ne 0; then
     die "Échec de création des images Docker (Core=$core_image_status, Content=$content_image_status, Renderer=$renderer_image_status)"
   fi
-  rm -rf "$runtime_context_root"
-  trap - EXIT
   mark_build api "$api_fingerprint"
 fi
 
@@ -234,16 +212,19 @@ fi
 
 set_progress "Frontend Stage — démarrage du conteneur"
 log "Démarrage du frontend"
-if docker container inspect ormt-web-stage >/dev/null 2>&1; then
-  log "Ancien conteneur frontend détecté: recréation sans suppression de données"
-  docker container rm --force ormt-web-stage >/dev/null
-fi
-compose_up "$ORMT_WEB_DIR" \
+(cd "$ORMT_WEB_DIR" && docker compose \
   --env-file ./docker/app/env/.env.stage \
   -f ./docker/app/docker-compose.ormt-web.stage.yml \
-  --project-name ormt-web-stage
+  --project-name ormt-web-stage \
+  up -d --force-recreate --remove-orphans)
 
-wait_for_container_health ormt-web-stage 60
+web_container_id="$(cd "$ORMT_WEB_DIR" && docker compose \
+  --env-file ./docker/app/env/.env.stage \
+  -f ./docker/app/docker-compose.ormt-web.stage.yml \
+  --project-name ormt-web-stage \
+  ps -q ormt-web-stage)"
+test -n "$web_container_id" || die "Conteneur frontend Stage absent après docker compose up"
+wait_for_container_health "$web_container_id" 60
 wait_for_host_route "Frontend Stage" "ormt.localhost" "/" 60
 clear_progress
 

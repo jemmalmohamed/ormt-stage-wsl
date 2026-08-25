@@ -312,7 +312,13 @@ repair_installation() {
   fi
 
   log "Tentative de redémarrage des conteneurs métier existants"
-  docker start ormt-core-api ormt-content-api ormt-pdf-renderer ormt-web-stage >/dev/null 2>&1 || true
+  docker start ormt-core-api ormt-content-api ormt-pdf-renderer >/dev/null 2>&1 || true
+  mapfile -t existing_web_containers < <(
+    docker ps -aq --filter label=com.docker.compose.project=ormt-web-stage
+  )
+  if test "${#existing_web_containers[@]}" -gt 0; then
+    docker start "${existing_web_containers[@]}" >/dev/null 2>&1 || true
+  fi
   sleep 15
   if "$SCRIPT_DIR/tests/test-stage.sh"; then
     log "Stage réparé sans reconstruction"
