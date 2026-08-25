@@ -36,7 +36,10 @@ bloc ORMT isolé et le retire lors de la suppression complète de la distributio
 Les images Core API et Content API sont construites directement avec les
 Dockerfiles officiels du dépôt `ormt-api`, comme en production. Le dossier
 unique `ormt-api/data/init-data` appartient au même contexte Docker pour les
-deux API. L'image du renderer PDF est construite depuis
+deux API. La construction Core régénère et valide automatiquement le manifeste
+et les empreintes du paquet `init-data`, y compris lorsque les autres tests
+Maven sont ignorés pour accélérer la reconstruction Stage. Aucune empreinte
+n'est maintenue manuellement. L'image du renderer PDF est construite depuis
 `ormt-api/ormt-pdf-renderer` avec l'image officielle Playwright.
 
 Après le démarrage de MinIO, l'installateur provisionne les buckets `ormt` et
