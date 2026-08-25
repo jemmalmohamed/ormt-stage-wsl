@@ -50,5 +50,6 @@ for service in nextcloud minio keycloak postgres; do
 done
 
 clear_state stage-validated
+clear_state stage-bootstrap-complete
 rm -f "${STATE_BUILDS:?}/api" "${STATE_BUILDS:?}/web"
 printf '\nRéinitialisation Stage terminée.\n'
