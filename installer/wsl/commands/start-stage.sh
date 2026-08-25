@@ -213,7 +213,9 @@ if test "$stage_action" != "deploy"; then
   log "Initialisation terminée: redémarrage définitif des API avec ORMT_ACTION=DEPLOYER"
   (cd "$ORMT_API_DIR" &&
     ORMT_ACTION=DEPLOYER API_RESTART_POLICY=always \
-      docker compose "${api_args[@]}" up -d --force-recreate ormt-core-api ormt-content-api)
+      docker compose "${api_args[@]}" up -d --force-recreate --no-deps ormt-core-api &&
+    ORMT_ACTION=DEPLOYER API_RESTART_POLICY=always \
+      docker compose "${api_args[@]}" up -d --force-recreate --no-deps ormt-content-api)
   wait_for_host_route "API Core après initialisation" "ormt-core-api.localhost" "/v3/api-docs" 90
   wait_for_host_route "API Content après initialisation" "ormt-content-api.localhost" "/api/v1/public/partenaires" 90
 fi
