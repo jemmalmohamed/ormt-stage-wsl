@@ -267,7 +267,7 @@ ensure_infrastructure() {
 
 install_stage() {
   run_with_live_output "Installation du Stage métier" \
-    "$SCRIPT_DIR/phases/install-stage.sh"
+    env STAGE_ACTION="$STAGE_ACTION" "$SCRIPT_DIR/phases/install-stage.sh"
 }
 
 validate_stage_prerequisites() {
