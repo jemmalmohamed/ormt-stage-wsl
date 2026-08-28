@@ -305,6 +305,12 @@ Après une initialisation réussie, les API sont recréées avec
 `DEPLOYER`. Une suppression complète des données n'est possible que par le
 menu de réinitialisation et sa confirmation explicite.
 
+Après chaque action **INITIALISER** ou **RÉINITIALISER**, l'installateur vérifie
+également toutes les images partenaires et tous les PDF de publications : chaque
+référence exposée par l'API Content doit obtenir une URL sécurisée. L'installation
+échoue si un objet est absent du bucket `ormt-content` ; un simple statut HTTP 200
+de l'API Content ne suffit donc pas à valider l'import.
+
 L'option `8. Réinitialisation / suppression` du menu propose deux niveaux :
 
 - **Réinitialiser uniquement le Stage métier** supprime ses conteneurs, volumes

@@ -50,6 +50,41 @@ check_container_env_absent() {
   fi
 }
 
+check_content_assets() {
+  local partenaires publications image_keys publication_keys file_key code checked=0 missing=0
+  partenaires="$(curl --silent --show-error --fail --header "Host: ormt-content-api.localhost" \
+    http://127.0.0.1/api/v1/public/partenaires 2>/dev/null || true)"
+  publications="$(curl --silent --show-error --fail --header "Host: ormt-content-api.localhost" \
+    'http://127.0.0.1/api/v1/public/publications?pageSize=100' 2>/dev/null || true)"
+  image_keys="$(printf '%s' "$partenaires" | grep --only-matching '"imageUrl":"[^"]*"' | sed 's/^"imageUrl":"//; s/"$//' || true)"
+  publication_keys="$(printf '%s' "$publications" | grep --only-matching '"fichierUrl":"[^"]*"' | sed 's/^"fichierUrl":"//; s/"$//' || true)"
+
+  if test -z "$image_keys" || test -z "$publication_keys"; then
+    printf '  [KO] %-28s données Content initiales absentes\n' "Fichiers Content" >&2
+    failures=$((failures + 1))
+    return
+  fi
+
+  while IFS= read -r file_key; do
+    test -n "$file_key" || continue
+    checked=$((checked + 1))
+    code="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+      --get --data-urlencode "fileKey=$file_key" \
+      --header "Host: ormt-content-api.localhost" \
+      http://127.0.0.1/api/v1/files/secure-url 2>/dev/null || true)"
+    if test "$code" != "200"; then
+      missing=$((missing + 1))
+    fi
+  done < <(printf '%s\n%s\n' "$image_keys" "$publication_keys")
+
+  if test "$missing" -eq 0; then
+    printf '  [OK] %-28s %s objet(s) MinIO vérifié(s)\n' "Fichiers Content" "$checked"
+  else
+    printf '  [KO] %-28s %s objet(s) absent(s) sur %s\n' "Fichiers Content" "$missing" "$checked" >&2
+    failures=$((failures + 1))
+  fi
+}
+
 log "État des conteneurs Stage"
 docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
 
@@ -61,6 +96,7 @@ check_http "API Swagger" '200' --header "Host: ormt-core-api.localhost" http://1
 check_http "API Partenaires" '200' --header "Host: ormt-content-api.localhost" http://127.0.0.1/api/v1/public/partenaires
 check_http "API Publications" '200' --header "Host: ormt-content-api.localhost" 'http://127.0.0.1/api/v1/public/publications?pageSize=1'
 check_http "API Observatoire" '200' --header "Host: ormt-content-api.localhost" http://127.0.0.1/api/v1/public/observatoire-content/current
+check_content_assets
 check_http "Nextcloud" '200' --header "Host: nextcloud.ormt.localhost" http://127.0.0.1/status.php
 check_http "Keycloak master" '200' --header "Host: users.ormt.localhost" http://127.0.0.1/realms/master
 check_http "MinIO" '200' --header "Host: minio.ormt.localhost" http://127.0.0.1/minio/health/live

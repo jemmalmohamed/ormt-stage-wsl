@@ -75,6 +75,42 @@ validate_core_initial_data() {
   log "OK: données initiales Core présentes"
 }
 
+validate_content_initial_data() {
+  local partenaires publications image_keys publication_keys file_key code checked=0 missing=0
+  partenaires="$(curl --silent --show-error --fail \
+    --header "Host: ormt-content-api.localhost" \
+    "http://127.0.0.1/api/v1/public/partenaires" 2>/dev/null || true)"
+  publications="$(curl --silent --show-error --fail \
+    --header "Host: ormt-content-api.localhost" \
+    "http://127.0.0.1/api/v1/public/publications?pageSize=100" 2>/dev/null || true)"
+  image_keys="$(printf '%s' "$partenaires" | grep --only-matching '"imageUrl":"[^"]*"' | sed 's/^"imageUrl":"//; s/"$//' || true)"
+  publication_keys="$(printf '%s' "$publications" | grep --only-matching '"fichierUrl":"[^"]*"' | sed 's/^"fichierUrl":"//; s/"$//' || true)"
+
+  if test -z "$image_keys" || test -z "$publication_keys"; then
+    docker logs --tail 200 ormt-content-api 2>/dev/null || true
+    die "Initialisation Content incomplète : images partenaires ou PDF publications absents après l'import init-data"
+  fi
+
+  while IFS= read -r file_key; do
+    test -n "$file_key" || continue
+    checked=$((checked + 1))
+    code="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+      --get --data-urlencode "fileKey=$file_key" \
+      --header "Host: ormt-content-api.localhost" \
+      "http://127.0.0.1/api/v1/files/secure-url" 2>/dev/null || true)"
+    if test "$code" != "200"; then
+      log "ERREUR: objet Content indisponible : $file_key (HTTP ${code:-000})"
+      missing=$((missing + 1))
+    fi
+  done < <(printf '%s\n%s\n' "$image_keys" "$publication_keys")
+
+  if test "$missing" -ne 0; then
+    docker logs --tail 200 ormt-content-api 2>/dev/null || true
+    die "Initialisation Content incomplète : $missing objet(s) MinIO absent(s) sur $checked vérifié(s)"
+  fi
+  log "OK: $checked fichier(s) init-data Content présents dans MinIO"
+}
+
 mapfile -t api_args < <(api_service_compose_args)
 (cd "$ORMT_API_DIR" && docker compose "${api_args[@]}" config --quiet)
 
@@ -175,6 +211,7 @@ wait_for_host_route "API Content Publications" "ormt-content-api.localhost" "/ap
 
 if test "$stage_action" != "deploy"; then
   validate_core_initial_data
+  validate_content_initial_data
   set_progress "API Core + Content — passage au mode de déploiement normal"
   log "Initialisation terminée: redémarrage définitif des API avec ORMT_ACTION=DEPLOYER"
   (cd "$ORMT_API_DIR" &&
