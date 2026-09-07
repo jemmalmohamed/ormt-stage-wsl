@@ -391,3 +391,34 @@ Le message final suivant signifie que tous les contrôles demandés sont passés
 ```text
 SUCCÈS — mode Full terminé et validé
 ```
+
+
+## Tester les demandes de contact et le SMTP
+
+Prérequis : disposer du stage installé et d’adresses internes de recette.
+Le dépôt ormt-api contient le guide complet dans docs/mailing-configuration.md
+et les clés à reporter dans docker/app/env/mailing.stage.example.env.
+
+Dans la configuration docker/app/env/.env.stage utilisée par l’installation,
+renseigner SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_AUTH et
+SMTP_STARTTLS_ENABLE par le canal protégé habituel. Pour ZeptoMail, utiliser
+smtp.zeptomail.com:587 et activer l’authentification et STARTTLS. Renseigner un
+expéditeur autorisé et CONTACT_NOTIFICATION_EMAIL avec une boîte réelle.
+
+Configurer MAILING_RESTRICT_RECIPIENTS=false pour envoyer les confirmations à
+tous les visiteurs ; MAILING_ALLOWED_RECIPIENTS peut rester vide. Remplacer toute
+ancienne valeur à true. Activer MAILING_WORKER_ENABLED=true après configuration
+du SMTP, puis appliquer
+le déploiement stage habituel afin de recréer Core avec ces variables.
+Aucun changement automatique du secret de production n’est réalisé par l’installateur.
+
+Résultat attendu : /public/contact crée une demande et sa référence ; /admin/contact
+permet le traitement et affiche deux emails « Accepté par le SMTP ». Vérifier les
+boîtes réelles avant de valider la recette. En cas d’erreur, désactiver le worker,
+corriger la configuration puis relancer seulement les emails FAILED/BLOCKED.
+Un résultat UNCERTAIN exige une vérification chez le fournisseur.
+
+Pour les essais locaux sans envoi externe, utiliser le Compose Mailpit décrit dans
+le guide API. Depuis un conteneur Core, localhost:1025 n’est pas un SMTP externe :
+utiliser un service de capture joignable sur son réseau Docker.
+Les campagnes newsletter restent désactivées sur ZeptoMail.
