@@ -66,6 +66,7 @@ echo.
 echo  1. DEPLOYER       - Mettre a jour sans importer les donnees
 echo  2. INITIALISER    - Importer init-data sans supprimer les donnees
 echo  3. REINITIALISER  - Supprimer les donnees puis tout initialiser
+echo  4. PREMIERE INSTALLATION - Socle et vrais administrateurs, sans donnees metier
 echo  0. Retour
 echo.
 set "ACTION_CHOICE="
@@ -74,6 +75,7 @@ if "%ACTION_CHOICE%"=="0" goto MENU
 if "%ACTION_CHOICE%"=="1" set "STAGE_ACTION=Deploy"
 if "%ACTION_CHOICE%"=="2" set "STAGE_ACTION=Initialize"
 if "%ACTION_CHOICE%"=="3" set "STAGE_ACTION=Reinitialize"
+if "%ACTION_CHOICE%"=="4" set "STAGE_ACTION=FirstInstallation"
 if not defined STAGE_ACTION goto STAGE_ACTION_MENU
 goto SOURCE_MENU
 

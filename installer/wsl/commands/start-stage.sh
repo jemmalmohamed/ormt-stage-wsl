@@ -17,6 +17,10 @@ case "$stage_action" in
     api_action="DEPLOYER"
     api_restart_policy="always"
     ;;
+  firstinstallation)
+    api_action="DEPLOYER_PREMIERE_INSTALLATION"
+    api_restart_policy="no"
+    ;;
   initialize)
     api_action="DEPLOYER_INITIALISER_DATA"
     api_restart_policy="no"
@@ -26,7 +30,7 @@ case "$stage_action" in
     api_restart_policy="no"
     ;;
   *)
-    die "Action Stage invalide: $stage_action (deploy, initialize ou reinitialize attendu)"
+    die "Action Stage invalide: $stage_action (deploy, firstinstallation, initialize ou reinitialize attendu)"
     ;;
 esac
 
@@ -111,6 +115,11 @@ validate_content_initial_data() {
   log "OK: $checked fichier(s) init-data Content présents dans MinIO"
 }
 
+if test -f "$INSTALL_ROOT/config/identity.stage.local.env"; then
+  install -m 600 "$INSTALL_ROOT/config/identity.stage.local.env" "$ORMT_API_DIR/config/env/identity.stage.local.env"
+fi
+test -f "$ORMT_API_DIR/config/env/identity.stage.local.env" || die "Créer config/env/identity.stage.local.env depuis config/env/identity.example.env et renseigner les identités et secrets Stage."
+
 mapfile -t api_args < <(api_service_compose_args)
 (cd "$ORMT_API_DIR" && docker compose "${api_args[@]}" config --quiet)
 
@@ -122,6 +131,7 @@ compose_up "$ORMT_API_DIR" \
   -f ./docker/services/postgres/docker-compose.postgres.stage.yml
 compose_up "$ORMT_API_DIR" \
   --env-file ./docker/services/keycloak/env/.env.stage \
+  --env-file ./config/env/identity.stage.local.env \
   -f ./docker/services/keycloak/docker-compose.kc.base.yml \
   -f ./docker/services/keycloak/docker-compose.kc.stage.yml
 compose_up "$ORMT_API_DIR" \
@@ -133,6 +143,8 @@ compose_up "$ORMT_API_DIR" \
   --env-file ./docker/services/nextcloud/env/.env.stage \
   -f ./docker/services/nextcloud/docker-compose.nextcloud.base.yml \
   -f ./docker/services/nextcloud/docker-compose.nextcloud.stage.yml
+
+compose_up "$ORMT_API_DIR" -f ./docker/dev/docker-compose.mailing.yml
 
 wait_for_container_health ormt-database 60
 wait_for_container_health minio-ormt 60
@@ -210,8 +222,10 @@ wait_for_host_route "API Content" "ormt-content-api.localhost" "/api/v1/public/p
 wait_for_host_route "API Content Publications" "ormt-content-api.localhost" "/api/v1/public/publications?pageSize=1" 90
 
 if test "$stage_action" != "deploy"; then
-  validate_core_initial_data
-  validate_content_initial_data
+  if test "$stage_action" != "firstinstallation"; then
+    validate_core_initial_data
+    validate_content_initial_data
+  fi
   set_progress "API Core + Content — passage au mode de déploiement normal"
   log "Initialisation terminée: redémarrage définitif des API avec ORMT_ACTION=DEPLOYER"
   (cd "$ORMT_API_DIR" &&

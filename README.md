@@ -49,9 +49,7 @@ au provisionnement ; les API ne le reçoivent pas et n'administrent pas MinIO.
 Le provisionnement vérifie avec le compte applicatif l'écriture, la lecture puis
 la suppression d'un objet temporaire dans chacun des deux buckets.
 
-Le Stage active également l'injection des utilisateurs Keycloak de test via une
-surcharge Compose locale à l'installateur. Le profil et le déploiement de
-production restent inchangés.
+Le Stage utilise ses identités privées pour le socle initial. Les comptes métier sont importés uniquement avec INITIALISER ou RÉINITIALISER, selon le même contrat que dev et production.
 
 Les branches applicatives utilisées par défaut pour l'API et le frontend sont
 `main`. Elles restent exécutées avec les fichiers et variables du profil Stage.
@@ -288,12 +286,100 @@ accessible dans `Ubuntu-24.04`.
 
 ## Réinitialisation et nouveau départ
 
+### Générer les identités fictives de test Stage
+
+Prérequis : Windows PowerShell 5.1 ou PowerShell 7, dépôt Stage local et aucun fichier
+`config/identity.stage.local.env` existant. Depuis la racine du dépôt Stage, exécuter :
+
+```powershell
+.\installer\windows\generate-stage-identities.ps1
+```
+
+Le script crée uniquement `config/identity.stage.local.env`, ignoré par Git, avec une ACL
+limitée à l'utilisateur Windows courant. Il ne démarre aucun conteneur et ne crée aucun
+compte dans Keycloak. Les 32 octets aléatoires de chaque secret sont générés indépendamment ;
+les valeurs secrètes ne sont pas affichées dans le terminal.
+
+| Usage | Username fictif | E-mail de test |
+| --- | --- | --- |
+| Titulaire ORMT master | `sara.stage` | `sara.stage@ormt.test` |
+| Titulaire ORMT admin | `amine.stage` | `amine.stage@ormt.test` |
+| Administration de la console Keycloak | `lina.stage` | `lina.stage@ormt.test` |
+
+Les trois mots de passe sont temporaires. Le compte technique d'amorçage
+`ormt-stage-bootstrap` et le secret permanent du client d'identités sont distincts.
+Le SMTP ORMT pointe sur Mailpit, sans identifiants réels ; il ne reprend aucun secret de
+la plateforme, de dev ou de production. Consulter les mots de passe uniquement dans le
+fichier privé avec l'éditeur local, sans les copier dans les tickets ou les journaux.
+
+Les comptes métier sont définis séparément dans le jeu API
+`data/init-data/authentication/users.json`. Renseigner leur `password` directement dans
+ce JSON et conserver `temporaryPassword: true`. Le générateur Stage s'occupe uniquement
+des trois administrateurs ; aucun secret métier supplémentaire n'est nécessaire.
+Le mode PREMIÈRE INSTALLATION ne crée pas les comptes métier. Choisir INITIALISER
+pour importer explicitement le jeu avec ses rôles. Garder Mailpit pour les tests :
+les profils métier peuvent conserver leurs adresses d'origine.
+
+Vérifier les trois identités générées sans afficher leurs mots de passe :
+
+```powershell
+.\installer\windows\test-stage-identities.ps1
+```
+
+Résultat attendu : identités fictives distinctes, mots de passe temporaires, secrets distincts,
+SMTP de capture, ACL protégée et refus d'écrasement. Le contrôle porte sur le jeu fictif
+produit par le générateur, pas sur une configuration personnalisée avec de vrais titulaires.
+Arrêt : si le fichier existe, le générateur refuse de le remplacer. Conserver ses valeurs
+pour toute reprise ; modifier les profils existants dans Keycloak selon la procédure
+prévue, sans régénérer les secrets pour contourner une divergence d'identité.
+
+Ensuite, suivre PREMIÈRE INSTALLATION ci-dessous en conservant le fichier généré.
+Les comptes métier ne sont créés que lors d'un import explicite INITIALISER ; ils restent
+séparés des trois identités d'administration. Après lancement, vérifier la connexion des
+trois personnes, le changement obligatoire des mots de passe, la réception des liens de
+récupération dans Mailpit et l'absence de données métier pour PREMIÈRE INSTALLATION.
+
+### Identités et première installation sans données métier
+
+1. Conserver le fichier généré ci-dessus pour un test fictif, ou copier
+   `config/identity.example.env` vers `config/identity.stage.local.env` pour des titulaires réels.
+2. Pour des titulaires réels, renseigner Master et Admin, l'administrateur de console Keycloak,
+   leurs e-mails et des mots de passe distincts ; conserver TEMPORARY_PASSWORD=true.
+3. Renseigner le secret du client technique Core et le secret temporaire d'amorçage.
+   Utiliser des secrets propres au Stage ; ne pas copier ceux de dev ou de production.
+4. Choisir **4 — PREMIÈRE INSTALLATION** dans le BAT, ou passer
+   `-StageAction FirstInstallation` à `installer/windows/setup.ps1`.
+
+Le fichier local est ignoré par Git. L'installateur le copie vers le dépôt API actif
+avec des droits 0600. Il ne dépend donc pas d'une modification des sources clonées.
+Les noms des utilisateurs ne sont pas imposés ; seuls les rôles master/admin sont fixes.
+Le socle technique est créé sans importer les utilisateurs et données métier.
+Après réussite, les deux API repassent automatiquement en DEPLOYER.
+
+Le modèle utilise le SMTP de capture local : `ormt-mailpit:1025`, sans authentification ni TLS.
+Consulter les messages sur http://localhost:8025. Pour le SMTP réel, renseigner
+SMTP_HOST, SMTP_PORT, SMTP_AUTH, SMTP_STARTTLS_ENABLE, SMTP_USERNAME, SMTP_PASSWORD
+et un expéditeur autorisé dans ce fichier privé. Les identifiants doivent être distincts de la plateforme.
+Les deux realms Keycloak reçoivent le SMTP ORMT lors du premier amorçage.
+
+Vérifier : deux humains ORMT, listes métier vides, connexion de chaque titulaire,
+changement de mot de passe obligatoire et récupération e-mail.
+Une reprise conserve les comptes existants. Si une identité enregistrée diffère,
+arrêter et corriger la configuration ; ne pas supprimer les volumes pour contourner ce contrôle.
+
+Pour importer un jeu métier, renseigner `password` (12 caractères minimum) et
+`temporaryPassword: true` dans `ormt-api/data/init-data/authentication/users.json`,
+puis choisir INITIALISER. Aucun mot de passe métier ne dépend du Vault ou du fichier env.
+Les définitions de rôles sont dans `authentication/roles.json`.
+Les modifications de temporaryPassword ne réinitialisent pas les comptes déjà existants.
+
 ### Installation, mise à jour et realm Keycloak
 
 Le BAT demande explicitement l'action à effectuer :
 
 - **DEPLOYER** : met à jour le code et redémarre avec `ORMT_ACTION=DEPLOYER`,
   sans importer ni supprimer les données ;
+- **PREMIÈRE INSTALLATION** : initialise le socle et les titulaires configurés, sans données métier ;
 - **INITIALISER** : utilise temporairement
   `ORMT_ACTION=DEPLOYER_INITIALISER_DATA` pour créer notamment le realm `ormt`
   et importer `init-data`, sans vider préalablement les bases ;
@@ -359,7 +445,7 @@ utilise par exemple :
 Les mots de passe du Stage local suivent le modèle `nomService@ormt` :
 
 - PostgreSQL : utilisateur `ormt`, mot de passe `postgres@ormt`
-- Keycloak : utilisateur `admin`, mot de passe `keycloak@ormt`
+- Keycloak : administrateur nominatif défini dans `config/identity.stage.local.env` ; changer son mot de passe initial à la première connexion.
 - MinIO : utilisateur `minio`, mot de passe `minio@ormt`
 - Nextcloud : utilisateur `admin`, mot de passe `nextcloud@ormt`
 - Portainer : utilisateur `admin`, mot de passe `portainer@ormt`

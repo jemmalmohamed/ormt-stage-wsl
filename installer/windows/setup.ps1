@@ -5,7 +5,7 @@
   [ValidateSet("Auto", "Provided", "Git")]
   [string]$SourceMode = "Auto",
 
-  [ValidateSet("Deploy", "Initialize", "Reinitialize")]
+  [ValidateSet("Deploy", "FirstInstallation", "Initialize", "Reinitialize")]
   [string]$StageAction = "Deploy",
 
   [string]$ProvidedSourcesDir = "",

@@ -77,7 +77,7 @@ case "$SOURCE_MODE" in
 esac
 
 case "$STAGE_ACTION" in
-  deploy|initialize|reinitialize) ;;
+  deploy|firstinstallation|initialize|reinitialize) ;;
   *)
     printf 'ERREUR: action Stage invalide: %s\n' "$STAGE_ACTION" >&2
     exit 2
