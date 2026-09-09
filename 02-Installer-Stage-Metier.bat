@@ -2,6 +2,8 @@
 setlocal
 chcp 65001 >nul
 title ORMT - Stage metier
+set "PROVIDED_SOURCES_DIR=%~1"
+if not defined PROVIDED_SOURCES_DIR set "PROVIDED_SOURCES_DIR=%~dp0sources"
 
 :ACTION
 cls
@@ -24,7 +26,7 @@ if "%ACTION_CHOICE%"=="3" set "STAGE_ACTION=Reinitialize"
 if "%ACTION_CHOICE%"=="4" set "STAGE_ACTION=FirstInstallation"
 if not defined STAGE_ACTION goto ACTION
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer\windows\setup.ps1" -Mode Stage -StageAction "%STAGE_ACTION%" -SourceMode Auto -ProvidedSourcesDir "%~dp0sources"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer\windows\setup.ps1" -Mode Stage -StageAction "%STAGE_ACTION%" -SourceMode Auto -ProvidedSourcesDir "%PROVIDED_SOURCES_DIR%"
 set "RESULT=%ERRORLEVEL%"
 echo.
 pause

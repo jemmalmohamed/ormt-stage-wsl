@@ -116,6 +116,21 @@ Le périmètre dépend du mode d'installation :
 
 ### Dossiers fournis
 
+Pour tester directement les dépôts frères Windows avec leurs modifications locales,
+lancer le BAT depuis le dépôt Stage en lui passant le dossier parent des projets :
+
+```powershell
+.\02-Installer-Stage-Metier.bat ..
+```
+
+Sans argument, le BAT utilise `sources/`. Choisir **3 — RÉINITIALISER** pour un test
+depuis zéro, puis confirmer `REINSTALLER` : tous les conteneurs et volumes métier
+Stage sont supprimés, y compris les bases Keycloak, ORMT, MinIO et Nextcloud.
+La plateforme partagée est conservée. Utiliser uniquement ce mode lorsque les données
+Stage peuvent être effacées. Les secrets de `config/identity.stage.local.env` sont
+réutilisés pour créer les trois administrateurs ; les mots de passe temporaires métier
+proviennent de `ormt-api/data/init-data/authentication/users.json`.
+
 Place les projets ainsi :
 
 ```text
@@ -296,17 +311,22 @@ Prérequis : Windows PowerShell 5.1 ou PowerShell 7, dépôt Stage local et aucu
 ```
 
 Le script crée uniquement `config/identity.stage.local.env`, ignoré par Git, avec une ACL
-limitée à l'utilisateur Windows courant. Il ne démarre aucun conteneur et ne crée aucun
-compte dans Keycloak. Les 32 octets aléatoires de chaque secret sont générés indépendamment ;
+limitée à l'utilisateur exécutant le générateur et au propriétaire du dossier Windows,
+afin que le BAT et WSL puissent le lire. Il ne démarre aucun conteneur et ne crée aucun
+compte dans Keycloak. Les secrets techniques de 32 octets sont générés indépendamment ;
 les valeurs secrètes ne sont pas affichées dans le terminal.
 
 | Usage | Username fictif | E-mail de test |
 | --- | --- | --- |
-| Titulaire ORMT master | `sara.stage` | `sara.stage@ormt.test` |
-| Titulaire ORMT admin | `amine.stage` | `amine.stage@ormt.test` |
-| Administration de la console Keycloak | `lina.stage` | `lina.stage@ormt.test` |
+| Titulaire ORMT master | `o.master` | `o.master@ormt.test` |
+| Titulaire ORMT admin | `o.admin` | `o.admin@ormt.test` |
+| Administration de la console Keycloak | `admin` | `admin@ormt.test` |
 
-Les trois mots de passe sont temporaires. Le compte technique d'amorçage
+Les comptes `o.master` et `o.admin` utilisent le mot de passe temporaire **ormt**,
+à changer à la première connexion.
+La console Keycloak utilise **admin / admin**, sans changement obligatoire, pour les tests
+Stage locaux. Ce réglage est propre au Stage ; les identités de production restent
+configurables dans le Vault. Le compte technique d'amorçage
 `ormt-stage-bootstrap` et le secret permanent du client d'identités sont distincts.
 Le SMTP ORMT pointe sur Mailpit, sans identifiants réels ; il ne reprend aucun secret de
 la plateforme, de dev ou de production. Consulter les mots de passe uniquement dans le
@@ -326,7 +346,7 @@ Vérifier les trois identités générées sans afficher leurs mots de passe :
 .\installer\windows\test-stage-identities.ps1
 ```
 
-Résultat attendu : identités fictives distinctes, mots de passe temporaires, secrets distincts,
+Résultat attendu : `o.master/ormt` et `o.admin/ormt` temporaires, console `admin/admin`, secrets techniques distincts,
 SMTP de capture, ACL protégée et refus d'écrasement. Le contrôle porte sur le jeu fictif
 produit par le générateur, pas sur une configuration personnalisée avec de vrais titulaires.
 Arrêt : si le fichier existe, le générateur refuse de le remplacer. Conserver ses valeurs
@@ -336,7 +356,7 @@ prévue, sans régénérer les secrets pour contourner une divergence d'identit�
 Ensuite, suivre PREMIÈRE INSTALLATION ci-dessous en conservant le fichier généré.
 Les comptes métier ne sont créés que lors d'un import explicite INITIALISER ; ils restent
 séparés des trois identités d'administration. Après lancement, vérifier la connexion des
-trois personnes, le changement obligatoire des mots de passe, la réception des liens de
+trois comptes, le changement obligatoire pour `o.master` et `o.admin`, la réception des liens de
 récupération dans Mailpit et l'absence de données métier pour PREMIÈRE INSTALLATION.
 
 ### Identités et première installation sans données métier
@@ -445,7 +465,7 @@ utilise par exemple :
 Les mots de passe du Stage local suivent le modèle `nomService@ormt` :
 
 - PostgreSQL : utilisateur `ormt`, mot de passe `postgres@ormt`
-- Keycloak : administrateur nominatif défini dans `config/identity.stage.local.env` ; changer son mot de passe initial à la première connexion.
+- Keycloak : `admin` / `admin` dans le realm `master` pour le jeu Stage généré. Les paramètres restent dans `config/identity.stage.local.env`.
 - MinIO : utilisateur `minio`, mot de passe `minio@ormt`
 - Nextcloud : utilisateur `admin`, mot de passe `nextcloud@ormt`
 - Portainer : utilisateur `admin`, mot de passe `portainer@ormt`

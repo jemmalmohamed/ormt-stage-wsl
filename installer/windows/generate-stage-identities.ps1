@@ -39,9 +39,9 @@ $lines.Add('KC_BOOTSTRAP_ADMIN_PASSWORD=' + (New-StageSecret))
 $lines.Add('ORMT_KEYCLOAK_SERVICE_CLIENT_SECRET=' + (New-StageSecret))
 
 $accounts = @(
-    @{ Prefix = 'ORMT_BOOTSTRAP_MASTER'; Username = 'sara.stage'; FirstName = 'Sara'; LastName = 'StageMaster' },
-    @{ Prefix = 'ORMT_BOOTSTRAP_ADMIN'; Username = 'amine.stage'; FirstName = 'Amine'; LastName = 'StageAdmin' },
-    @{ Prefix = 'ORMT_KEYCLOAK_CONSOLE_ADMIN'; Username = 'lina.stage'; FirstName = 'Lina'; LastName = 'StageIdentites' }
+    @{ Prefix = 'ORMT_BOOTSTRAP_MASTER'; Username = 'o.master'; FirstName = 'Master'; LastName = 'Stage' },
+    @{ Prefix = 'ORMT_BOOTSTRAP_ADMIN'; Username = 'o.admin'; FirstName = 'Admin'; LastName = 'Stage' },
+    @{ Prefix = 'ORMT_KEYCLOAK_CONSOLE_ADMIN'; Username = 'admin'; FirstName = 'Admin'; LastName = 'Stage' }
 )
 foreach ($account in $accounts) {
     $lines.Add('')
@@ -50,8 +50,11 @@ foreach ($account in $accounts) {
     $lines.Add($account.Prefix + '_EMAIL=' + $account.Username + '@ormt.test')
     $lines.Add($account.Prefix + '_FIRST_NAME=' + $account.FirstName)
     $lines.Add($account.Prefix + '_LAST_NAME=' + $account.LastName)
-    $lines.Add($account.Prefix + '_INITIAL_PASSWORD=' + (New-StageSecret))
-    $lines.Add($account.Prefix + '_TEMPORARY_PASSWORD=true')
+    $console = $account.Prefix -eq 'ORMT_KEYCLOAK_CONSOLE_ADMIN'
+    $initialPassword = if ($console) { 'admin' } else { 'ormt' }
+    $temporary = if ($console) { 'false' } else { 'true' }
+    $lines.Add($account.Prefix + '_INITIAL_PASSWORD=' + $initialPassword)
+    $lines.Add($account.Prefix + '_TEMPORARY_PASSWORD=' + $temporary)
 }
 
 $lines.Add('')
@@ -67,11 +70,16 @@ $lines.Add('')
 $stream = [System.IO.File]::Open($destination, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
 $stream.Dispose()
 try {
-    $acl = Get-Acl -LiteralPath $destination
+    $acl = [System.Security.AccessControl.FileSecurity]::new()
     $acl.SetAccessRuleProtection($true, $false)
     $sid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
     $rule = [System.Security.AccessControl.FileSystemAccessRule]::new($sid, 'FullControl', 'Allow')
     $acl.SetAccessRule($rule)
+    # Permettre aussi à l'utilisateur propriétaire du dossier de lancer le BAT/WSL,
+    # y compris lorsque le générateur tourne sous un compte d'automatisation isolé.
+    $directoryOwner = (Get-Acl -LiteralPath ([System.IO.Path]::GetDirectoryName($destination))).Owner
+    $ownerSid = [System.Security.Principal.NTAccount]::new($directoryOwner).Translate([System.Security.Principal.SecurityIdentifier])
+    $acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new($ownerSid, 'FullControl', 'Allow'))
     Set-Acl -LiteralPath $destination -AclObject $acl
     [System.IO.File]::WriteAllText($destination, ($lines -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
 } catch {
@@ -82,4 +90,4 @@ try {
     $lines.Clear()
 }
 Write-Host ('Fichier privé créé : {0}' -f $destination)
-Write-Host '3 identités de test ; SMTP Mailpit ; mots de passe temporaires.'
+Write-Host 'Stage : o.master/ormt et o.admin/ormt temporaires ; console admin/admin ; SMTP Mailpit.'

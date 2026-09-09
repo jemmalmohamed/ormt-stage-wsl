@@ -18,18 +18,23 @@ function Assert-Stage([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
 $secretKeys = @('KC_BOOTSTRAP_ADMIN_PASSWORD', 'ORMT_KEYCLOAK_SERVICE_CLIENT_SECRET')
+$expectedUsers = @{ ORMT_BOOTSTRAP_MASTER = 'o.master'; ORMT_BOOTSTRAP_ADMIN = 'o.admin'; ORMT_KEYCLOAK_CONSOLE_ADMIN = 'admin' }
 $usernames = @()
 $emails = @()
 foreach ($prefix in @('ORMT_BOOTSTRAP_MASTER', 'ORMT_BOOTSTRAP_ADMIN', 'ORMT_KEYCLOAK_CONSOLE_ADMIN')) {
     $usernames += $values[$prefix + '_USERNAME']
     $emails += $values[$prefix + '_EMAIL']
-    Assert-Stage ($values[$prefix + '_USERNAME'] -cmatch '^[a-z][a-z0-9.]+\.stage$') 'Identité fictive Stage attendue.'
+    Assert-Stage ($values[$prefix + '_USERNAME'] -ceq $expectedUsers[$prefix]) 'Identité de test Stage attendue.'
     Assert-Stage ($values[$prefix + '_EMAIL'] -cmatch '^[a-z0-9.]+@ormt\.test$') 'Domaine de test attendu.'
-    Assert-Stage ($values[$prefix + '_TEMPORARY_PASSWORD'] -ceq 'true') 'Changement de mot de passe obligatoire attendu.'
+    $temporary = if ($prefix -eq 'ORMT_KEYCLOAK_CONSOLE_ADMIN') { 'false' } else { 'true' }
+    Assert-Stage ($values[$prefix + '_TEMPORARY_PASSWORD'] -ceq $temporary) 'Politique de mot de passe Stage incorrecte.'
     Assert-Stage (-not [string]::IsNullOrWhiteSpace($values[$prefix + '_FIRST_NAME'])) 'Prénom absent.'
     Assert-Stage (-not [string]::IsNullOrWhiteSpace($values[$prefix + '_LAST_NAME'])) 'Nom absent.'
-    $secretKeys += $prefix + '_INITIAL_PASSWORD'
+    if ($prefix -ne 'ORMT_KEYCLOAK_CONSOLE_ADMIN') {
+        Assert-Stage ($values[$prefix + '_INITIAL_PASSWORD'] -ceq 'ormt') 'Mot de passe ORMT Stage incorrect.'
+    }
 }
+Assert-Stage ($values['ORMT_KEYCLOAK_CONSOLE_ADMIN_INITIAL_PASSWORD'] -ceq 'admin') 'Mot de passe de console Stage incorrect.'
 Assert-Stage (@($usernames | Select-Object -Unique).Count -eq 3) 'Les utilisateurs doivent être distincts.'
 Assert-Stage (@($emails | Select-Object -Unique).Count -eq 3) 'Les e-mails doivent être distincts.'
 foreach ($key in $secretKeys) {
