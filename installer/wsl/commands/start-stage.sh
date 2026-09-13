@@ -147,7 +147,7 @@ compose_up "$ORMT_API_DIR" \
 compose_up "$ORMT_API_DIR" -f ./docker/dev/docker-compose.mailing.yml
 
 wait_for_container_health ormt-database 60
-wait_for_container_health minio-ormt 60
+wait_for_container_health ormt-minio 60
 
 set_progress "MinIO — vérification du provisionnement"
 log "Vérification du provisionnement MinIO"
