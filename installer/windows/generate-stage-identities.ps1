@@ -5,11 +5,15 @@ Génère les identités fictives Stage et leurs secrets dans un fichier local pr
 #>
 [CmdletBinding()]
 param(
-    [string]$OutputPath = (Join-Path $PSScriptRoot '../../config/identity.stage.local.env')
+    [string]$OutputPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+
+if ([string]::IsNullOrWhiteSpace($OutputPath)) {
+    $OutputPath = Join-Path $PSScriptRoot '../../config/identity.stage.local.env'
+}
 
 function New-StageSecret {
     $bytes = New-Object byte[] 32

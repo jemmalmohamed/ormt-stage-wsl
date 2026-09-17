@@ -138,7 +138,8 @@ compose_up "$ORMT_API_DIR" \
   --env-file ./docker/services/minio/env/.env.stage \
   --env-file ./docker/app/env/.env.stage \
   -f ./docker/services/minio/docker-compose.minio.base.yml \
-  -f ./docker/services/minio/docker-compose.minio.stage.yml
+  -f ./docker/services/minio/docker-compose.minio.stage.yml \
+  -f "$WSL_ROOT/templates/docker-compose.minio.stage-local.yml"
 compose_up "$ORMT_API_DIR" \
   --env-file ./docker/services/nextcloud/env/.env.stage \
   -f ./docker/services/nextcloud/docker-compose.nextcloud.base.yml \

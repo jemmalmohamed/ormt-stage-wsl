@@ -1,18 +1,24 @@
 #requires -Version 5.1
 [CmdletBinding()]
 param(
-    [string]$IdentityPath = (Join-Path $PSScriptRoot '../../config/identity.stage.local.env')
+    [string]$IdentityPath = ''
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+
+if ([string]::IsNullOrWhiteSpace($IdentityPath)) {
+    $IdentityPath = Join-Path $PSScriptRoot '../../config/identity.stage.local.env'
+}
 
 # Vérification du jeu fictif généré ; aucune valeur secrète dans les sorties.
 $values = @{}
 foreach ($line in [System.IO.File]::ReadAllLines((Resolve-Path -LiteralPath $IdentityPath))) {
     if (-not $line -or $line.StartsWith('#')) { continue }
-    $pair = $line.Split(@('='), 2)
-    if ($pair.Count -ne 2 -or $values.ContainsKey($pair[0])) { throw 'Clé invalide ou dupliquée.' }
-    $values[$pair[0]] = $pair[1]
+    $separator = $line.IndexOf('=')
+    if ($separator -lt 1) { throw 'Clé invalide ou dupliquée.' }
+    $key = $line.Substring(0, $separator)
+    if ($values.ContainsKey($key)) { throw 'Clé invalide ou dupliquée.' }
+    $values[$key] = $line.Substring($separator + 1)
 }
 function Assert-Stage([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }

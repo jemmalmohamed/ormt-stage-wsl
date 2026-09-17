@@ -42,7 +42,12 @@ Maven sont ignorés pour accélérer la reconstruction Stage. Aucune empreinte
 n'est maintenue manuellement. L'image du renderer PDF est construite depuis
 `ormt-api/ormt-pdf-renderer` avec l'image officielle Playwright.
 
-Après le démarrage de MinIO, l'installateur provisionne les buckets `ormt` et
+Le Stage utilise les images MinIO officielles de `quay.io` pour le serveur et le
+client de provisionnement. En cas d'échec de téléchargement d'une ancienne référence
+`minio/mc` depuis Docker Hub, relancer le même BAT après mise à jour de cet
+installateur : les conteneurs déjà créés et les volumes sont conservés, sauf si
+l'action `REINITIALISER` est choisie à nouveau.
+Après le démarrage de MinIO, le provisionnement prépare les buckets `ormt` et
 `ormt-content`, puis attache au compte applicatif `ormt` une politique limitée
 aux opérations objet nécessaires. Le compte administrateur local reste réservé
 au provisionnement ; les API ne le reçoivent pas et n'administrent pas MinIO.
@@ -354,6 +359,10 @@ pour toute reprise ; modifier les profils existants dans Keycloak selon la proc�
 prévue, sans régénérer les secrets pour contourner une divergence d'identité.
 
 Ensuite, suivre PREMIÈRE INSTALLATION ci-dessous en conservant le fichier généré.
+Si l'installation s'arrête sur l'absence de `identity.stage.local.env`, créer ce
+fichier avec la commande ci-dessus, vérifier les identités, puis relancer le même
+BAT avec l'action Stage souhaitée. La relance réutilise le fichier privé ; choisir
+`REINITIALISER` supprime de nouveau les conteneurs, volumes et données métier Stage.
 Les comptes métier ne sont créés que lors d'un import explicite INITIALISER ; ils restent
 séparés des trois identités d'administration. Après lancement, vérifier la connexion des
 trois comptes, le changement obligatoire pour `o.master` et `o.admin`, la réception des liens de
