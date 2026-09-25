@@ -42,11 +42,11 @@ Maven sont ignorés pour accélérer la reconstruction Stage. Aucune empreinte
 n'est maintenue manuellement. L'image du renderer PDF est construite depuis
 `ormt-api/ormt-pdf-renderer` avec l'image officielle Playwright.
 
-Le Stage utilise les images MinIO officielles de `quay.io` pour le serveur et le
-client de provisionnement. En cas d'échec de téléchargement d'une ancienne référence
-`minio/mc` depuis Docker Hub, relancer le même BAT après mise à jour de cet
-installateur : les conteneurs déjà créés et les volumes sont conservés, sauf si
-l'action `REINITIALISER` est choisie à nouveau.
+Le Stage utilise l'image communautaire publique `ghcr.io/coollabsio/minio`,
+construite depuis les sources MinIO et fixée à un digest immuable, pour le
+serveur et le client de provisionnement. En cas d'échec temporaire du registre,
+relancer le même BAT : les conteneurs déjà créés et les volumes sont conservés,
+sauf si l'action `REINITIALISER` est choisie à nouveau.
 Après le démarrage de MinIO, le provisionnement prépare les buckets `ormt` et
 `ormt-content`, puis attache au compte applicatif `ormt` une politique limitée
 aux opérations objet nécessaires. Le compte administrateur local reste réservé
